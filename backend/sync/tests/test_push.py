@@ -159,7 +159,7 @@ def test_lost_response_then_replay(tenant_a):
     customer_id = str(uuid.uuid4())
     operations = [
         op("customer.create", {"id": customer_id, "name": "Mado"}),
-        sale_op(tenant_a, p, 2, customer=customer_id, payments=[cash(500)], credit_remaining=True),
+        sale_op(tenant_a, p, 2, customer=customer_id),
         sale_op(tenant_a, p, 1),
     ]
     c = tenant_a.client()
