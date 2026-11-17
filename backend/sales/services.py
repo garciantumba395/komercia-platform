@@ -25,7 +25,7 @@ from audit import services as audit
 from catalog.models import Product
 from core.permissions import CASHIER, MANAGER, OWNER
 from core.tenancy import get_current_tenant_id
-from currency.money import convert_minor, compute_payment, format_minor
+from currency.money import compute_payment, convert_minor, format_minor
 from currency.services import NoExchangeRate, snapshot
 from customers import services as credit
 from customers.models import KIND_CHARGE, KIND_PAYMENT, CreditEntry, Customer, PaymentAllocation
@@ -82,7 +82,7 @@ def _plain(value: Decimal) -> str:
 
 
 def _normalized_request(data: dict, currency: str, change_currency: str) -> dict:
-    """Contenu métier de la requête (hors client_id, horloge appareil et override) pour comparer deux rejeux."""
+    """Contenu métier (hors client_id, horloge appareil et override) pour comparer deux rejeux."""
     return {
         "store": str(data["store"]),
         "currency": currency,
@@ -409,7 +409,7 @@ def open_session(*, store_id, user, opening_float) -> CashSession:
 
 
 def session_totals(session: CashSession) -> dict:
-    """Ventes non annulées de la session : nombre et espèces nettes (encaissées − monnaie rendue) par devise."""
+    """Ventes non annulées de la session : nombre et espèces nettes (encaissées − rendu) par devise."""
     sales = Sale.objects.filter(cash_session=session, status=Sale.COMPLETED)
     cash = dict.fromkeys(CURRENCY_CODES, 0)
     rows = (Payment.objects.filter(sale__in=sales, method="cash")

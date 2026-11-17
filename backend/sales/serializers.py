@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from .models import CURRENCIES, CashSession, Payment, Sale, SaleItem
@@ -7,7 +9,7 @@ CURRENCY_CODES = [c for c, _ in CURRENCIES]
 
 class SaleItemInputSerializer(serializers.Serializer):
     product = serializers.UUIDField()
-    quantity = serializers.DecimalField(max_digits=12, decimal_places=3, min_value=0.001)
+    quantity = serializers.DecimalField(max_digits=12, decimal_places=3, min_value=Decimal("0.001"))
     unit_price_minor = serializers.IntegerField(min_value=0, required=False)
     discount_minor = serializers.IntegerField(min_value=0, required=False, default=0)
 

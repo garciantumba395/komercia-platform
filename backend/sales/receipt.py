@@ -53,8 +53,7 @@ def receipt_context(sale, tenant_name: str) -> dict:
         "cashier": sale.cashier.full_name,
         "customer": sale.customer.name if sale.customer_id else None,
         "lines": lines,
-        "subtotal": _money(sale.subtotal_minor + line_discounts, cur) if line_discounts else
-        _money(sale.subtotal_minor, cur),
+        "subtotal": _money(sale.subtotal_minor + line_discounts, cur),  # avant toute remise
         "line_discounts": _money(line_discounts, cur) if line_discounts else None,
         "discount": _money(sale.discount_minor, cur) if sale.discount_minor else None,
         "total": _money(sale.total_minor, cur),
