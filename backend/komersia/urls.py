@@ -21,6 +21,7 @@ urlpatterns = [
     path("api/v1/reports/", include("reports.urls")),
     path("api/v1/currency/", include("currency.urls")),
     path("api/v1/audit/", include("audit.urls")),
+    path("api/v1/sync/", include("sync.urls")),
     path("app/", include("web.urls")),
     path("", include("core.web_urls")),
 ]

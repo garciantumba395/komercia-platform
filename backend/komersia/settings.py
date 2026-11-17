@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "currency",
     "audit",
     "web",
+    "sync",
 ]
 
 MIDDLEWARE = [
