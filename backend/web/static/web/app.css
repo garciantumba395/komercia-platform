@@ -282,3 +282,14 @@ td.num, th.num { text-align: right; white-space: nowrap; }
   .topbar-info { flex-direction: column; align-items: flex-end; gap: .15rem; }
   .topbar-info select { max-width: 130px; }
 }
+
+/* ---- recette navigateur ---- */
+.chip-link { color: inherit; text-decoration: none; }
+.chip-link:hover, .chip-link:focus-visible { text-decoration: underline; }
+.chip-warn { background: #fff3cd; color: #5c3b00; border-color: #e0a800; }
+.chip-warn .chip-link { color: #5c3b00; }
+.tabs button { padding-left: .6rem; padding-right: .6rem; }
+.detail-grid { display: grid; grid-template-columns: auto 1fr; gap: .25rem .9rem; margin: 0 0 .8rem; }
+.detail-grid dt { color: var(--muted, #5b665f); font-size: .9rem; }
+.detail-grid dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.row-card.clickable { cursor: pointer; }

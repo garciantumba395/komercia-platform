@@ -259,7 +259,7 @@
   }
 
   function describe(status, data, isJson) {
-    if (status === 401) return 'Votre session a expiré. Reconnectez-vous.';
+    if (status === 401) return 'Votre session a expiré ou votre compte n’est plus actif. Reconnectez-vous.';
     if (status === 429) return 'Trop de tentatives : patientez une minute puis réessayez.';
     if (status >= 500) return 'Erreur du serveur. Réessayez dans un instant.';
     if (!isJson && status === 404) return 'Service indisponible pour le moment.';
@@ -271,7 +271,8 @@
 
   function logout(redirect) {
     ['kom_token', 'kom_role', 'kom_name', 'kom_tenant'].forEach(store.del);
-    if (redirect !== false) window.location.replace('/app/connexion/');
+    if (redirect === 'expired') window.location.replace('/app/connexion/?expired=1');
+    else if (redirect !== false) window.location.replace('/app/connexion/');
   }
   K.logout = logout;
 
@@ -292,7 +293,7 @@
     }
     const type = res.headers.get('content-type') || '';
     const isJson = type.includes('json');
-    if (res.status === 401 && token && !o.keepSession) { logout(); throw new ApiError(401, null, describe(401)); }
+    if (res.status === 401 && token && !o.keepSession) { logout('expired'); throw new ApiError(401, null, describe(401)); }
     if (!res.ok) {
       let data = null;
       if (isJson) { try { data = await res.json(); } catch (e) { data = null; } }
@@ -391,12 +392,13 @@
   function showRateChip(ctx) {
     const chip = document.getElementById('rate-chip');
     if (!chip) return;
-    if (ctx.rate) {
-      chip.hidden = false;
-      chip.textContent = '1 $ = ' + fmt(Math.round(parseFloat(ctx.rate)), 'CDF');
-    } else {
-      chip.hidden = false;
-      chip.textContent = 'Taux non défini';
+    chip.hidden = false;
+    chip.textContent = ctx.rate ? '1 $ = ' + fmt(Math.round(parseFloat(ctx.rate)), 'CDF') : 'Taux non défini';
+    chip.classList.toggle('chip-warn', !ctx.rate);
+    if (canOpen('rates', ctx.role) && document.body.dataset.page !== 'rates') {
+      const a = h('a', { href: '/app/taux/', class: 'chip-link', 'aria-label': chip.textContent + ' : ouvrir la page Taux de change' }, chip.textContent);
+      chip.textContent = '';
+      chip.appendChild(a);
     }
   }
 
@@ -486,6 +488,7 @@
 
   K.pages.login = function (view) {
     const errorSlot = h('div');
+    if (new URLSearchParams(window.location.search).get('expired')) errorSlot.appendChild(alertBox('Votre session a expiré ou votre compte n’est plus actif. Reconnectez-vous.', 'warn'));
     const phone = h('input', { type: 'tel', name: 'phone', autocomplete: 'username', inputmode: 'tel', required: true, placeholder: '+243 99 000 0000' });
     const password = h('input', { type: 'password', name: 'password', autocomplete: 'current-password', required: true });
     const submit = h('button', { type: 'submit', class: 'btn btn-big' }, 'Se connecter');
@@ -501,7 +504,10 @@
           const data = await api('auth/login/', { method: 'POST', body: { phone: normalizePhone(phone.value), password: password.value }, keepSession: true });
           saveSession(data);
           window.location.replace(nextUrl(data.role));
-        } catch (err) { errorSlot.appendChild(alertBox(err.message)); }
+        } catch (err) {
+          errorSlot.appendChild(alertBox(err.status === 403
+            ? 'Ce compte est désactivé ou n’a plus accès à une entreprise. Contactez le propriétaire du commerce.' : err.message));
+        }
       });
     });
     clear(view).append(form, h('p', { class: 'auth-switch' }, 'Pas encore de compte ? ', h('a', { href: '/app/inscription/' }, 'Créer mon commerce')));
