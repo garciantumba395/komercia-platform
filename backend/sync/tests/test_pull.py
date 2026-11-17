@@ -191,7 +191,8 @@ def test_inactive_customer_is_propagated(tenant_a):
 
 def test_customer_pagination_with_balance_ties(tenant_a):
     with tenant_context(tenant_a.tenant.id):
-        Customer.objects.bulk_create([Customer(tenant_id=tenant_a.tenant.id, name=f"C{i}") for i in range(12)])
+        Customer.objects.bulk_create(
+            [Customer(tenant_id=tenant_a.tenant.id, name=f"C{i}") for i in range(12)])
         Customer.objects.update(updated_at=timezone.now() - timedelta(days=1))
     ids, _, _ = collect(tenant_a.client(), limit=5)
     assert len(ids["customers"]) == 12 == len(set(ids["customers"]))

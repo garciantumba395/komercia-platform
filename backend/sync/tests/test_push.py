@@ -19,7 +19,6 @@ from sync.models import AppendOnlyError, SyncOperation
 from sync.tests.helpers import (
     DEVICE,
     PUSH,
-    cash,
     client_for_role,
     make_customer,
     make_product,
@@ -140,7 +139,7 @@ def test_concurrent_pushes_same_op_ids_no_duplicate(tenant_a):
     for res in all_results:  # chaque opération a un résultat dans chaque réponse
         assert [r["op_id"] for r in res] == [o["op_id"] for o in operations]
         assert all(r["status"] in ("applied", "duplicate") for r in res)
-    for i, operation in enumerate(operations):  # une seule réponse a "applied", même entité partout
+    for i in range(len(operations)):  # une seule réponse a "applied", même entité partout
         statuses = sorted(res[i]["status"] for res in all_results)
         assert statuses == ["applied", "duplicate", "duplicate", "duplicate"], statuses
         assert len({res[i]["entity_id"] for res in all_results}) == 1
@@ -453,7 +452,8 @@ def test_sale_cancel_by_client_id_and_credit_sale(tenant_a):
 
 
 def test_cancel_of_unknown_sale_is_dependency_missing(tenant_a):
-    r = results(push(tenant_a.client(), [op("sale.cancel", {"client_id": str(uuid.uuid4()), "reason": "x"})]))[0]
+    unknown = op("sale.cancel", {"client_id": str(uuid.uuid4()), "reason": "x"})
+    r = results(push(tenant_a.client(), [unknown]))[0]
     assert r["error"]["code"] == "dependency_missing"
     r = results(push(tenant_a.client(), [op("sale.cancel", {"sale_id": "nope", "reason": "x"})]))[0]
     assert r["error"]["code"] == "validation_error"

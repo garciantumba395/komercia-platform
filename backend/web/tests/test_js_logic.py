@@ -28,7 +28,8 @@ const ctx = vm.createContext({
 vm.runInContext(fs.readFileSync(process.argv[1], 'utf8'), ctx);
 const K = win.Komersia;
 const arg = (a) => (typeof a === 'string' && a.startsWith('rate:') ? K.rateScaled(a.slice(5)) : a);
-const out = JSON.parse(process.argv[2]).map(([fn, args]) => fn.split('.').reduce((o, k) => o[k], K)(...args.map(arg)));
+const call = (fn) => fn.split('.').reduce((o, k) => o[k], K);
+const out = JSON.parse(process.argv[2]).map(([fn, args]) => call(fn)(...args.map(arg)));
 console.log(JSON.stringify(out));
 """
 
