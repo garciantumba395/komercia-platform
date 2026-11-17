@@ -1,14 +1,8 @@
-from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.db import models
 from django.db.models import Q
-from django.db.models.functions import Lower, Upper
+from django.db.models.functions import Lower
 
 from core.models import TenantOwnedModel
-
-
-def _trgm(field: str, name: str) -> GinIndex:
-    """Index trigramme sur UPPER(champ) : sert les recherches `icontains` (ILIKE '%q%')."""
-    return GinIndex(OpClass(Upper(field), name="gin_trgm_ops"), name=name)
 
 
 class Category(TenantOwnedModel):
@@ -23,7 +17,6 @@ class Category(TenantOwnedModel):
         constraints = [
             models.UniqueConstraint(Lower("name"), "tenant", name="uniq_category_name_per_tenant"),
         ]
-        indexes = [_trgm("name", "cat_name_trgm")]
 
     def __str__(self):
         return self.name
@@ -69,9 +62,6 @@ class Product(TenantOwnedModel):
             ),
         ]
         indexes = [
-            _trgm("name", "prod_name_trgm"),
-            _trgm("sku", "prod_sku_trgm"),
-            _trgm("barcode", "prod_barcode_trgm"),
             models.Index(fields=["tenant", "kind", "is_active"], name="prod_kind_active_idx"),
         ]
 

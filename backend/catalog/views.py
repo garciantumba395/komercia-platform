@@ -80,7 +80,7 @@ class ProductViewSet(viewsets.ModelViewSet):
             return super().destroy(request, *args, **kwargs)
         except ProtectedError:
             return Response(
-                {"detail": "Ce produit a un historique (stock, ventes) : désactivez-le au lieu de le supprimer."},
+                {"detail": "Ce produit a un historique : désactivez-le plutôt que de le supprimer."},
                 status=status.HTTP_409_CONFLICT,
             )
 

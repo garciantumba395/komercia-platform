@@ -53,7 +53,9 @@ class MovementCreateSerializer(serializers.Serializer):
 
     product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
     store = serializers.PrimaryKeyRelatedField(queryset=Store.objects.all())
-    kind = serializers.ChoiceField(choices=[("in", "Entrée"), ("out", "Sortie"), ("adjustment", "Ajustement")])
+    kind = serializers.ChoiceField(
+        choices=[("in", "Entrée"), ("out", "Sortie"), ("adjustment", "Ajustement")]
+    )
     quantity = serializers.DecimalField(max_digits=12, decimal_places=3)
     unit_cost_minor = serializers.IntegerField(min_value=0, required=False, allow_null=True)
     reason = serializers.CharField(required=False, allow_blank=True, default="")

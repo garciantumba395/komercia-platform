@@ -45,15 +45,17 @@ def import_products(raw: bytes) -> dict:
     seen_barcodes = set(Product.objects.exclude(barcode="").values_list("barcode", flat=True))
     categories = {c.name.lower(): c for c in Category.objects.all()}
 
+    def cell(record, key):
+        return (record.get(key) or "").strip()
+
     for index, record in enumerate(reader, start=2):  # ligne 1 = en-tête
         if index - 1 > MAX_ROWS:
             raise ImportFileError(f"Trop de lignes (maximum {MAX_ROWS}).")
-        get = lambda key: (record.get(key) or "").strip()  # noqa: E731
         errors = []
-        name, sku, barcode = get("name"), get("sku"), get("barcode")
-        kind = get("kind").lower() or "product"
-        unit = get("unit").lower() or "piece"
-        currency = get("currency").upper() or "CDF"
+        name, sku, barcode = cell(record, "name"), cell(record, "sku"), cell(record, "barcode")
+        kind = cell(record, "kind").lower() or "product"
+        unit = cell(record, "unit").lower() or "piece"
+        currency = cell(record, "currency").upper() or "CDF"
         if not name:
             errors.append("Le nom est obligatoire.")
         if not sku:
@@ -71,9 +73,9 @@ def import_products(raw: bytes) -> dict:
         price = cost = 0
         if currency in CURRENCIES:
             for label, key in (("prix", "price"), ("coût", "cost")):
-                if get(key):
+                if cell(record, key):
                     try:
-                        value = to_minor(get(key), currency)
+                        value = to_minor(cell(record, key), currency)
                     except ValueError as exc:
                         errors.append(f"{label.capitalize()} : {exc}")
                     else:
@@ -82,11 +84,11 @@ def import_products(raw: bytes) -> dict:
             try:
                 with transaction.atomic():
                     category = None
-                    if get("category"):
-                        key = get("category").lower()
-                        category = categories.get(key)
+                    if cell(record, "category"):
+                        key = cell(record, "category").lower()
+                        category = categories.cell(record, key)
                         if category is None:
-                            category = Category.objects.create(name=get("category"))
+                            category = Category.objects.create(name=cell(record, "category"))
                             categories[key] = category
                     Product.objects.create(
                         name=name, sku=sku, barcode=barcode, category=category, kind=kind, unit=unit,

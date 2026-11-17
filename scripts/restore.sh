@@ -61,8 +61,18 @@ if [ -n "$EXISTE" ]; then
   fi
 fi
 
+CREEE=0
+nettoyer_si_echec() {
+  if [ "$CREEE" = "1" ]; then
+    echo "Échec : suppression de la base $CIBLE incomplète." >&2
+    psql_admin -c "DROP DATABASE IF EXISTS \"$CIBLE\" WITH (FORCE)" >/dev/null || true
+  fi
+}
+trap nettoyer_si_echec ERR
+
 echo "Création de la base $CIBLE (propriétaire ${RESTORE_DB_USER})..."
 psql_admin -c "CREATE DATABASE \"$CIBLE\" OWNER \"$RESTORE_DB_USER\""
+CREEE=1
 
 echo "Restauration de $FICHIER vers $CIBLE..."
 # --no-owner / --no-acl : tout appartient au rôle de restauration (propriétaire), les droits applicatifs
@@ -83,4 +93,5 @@ else
   echo "Rôle $APP_ROLE absent : droits applicatifs non rétablis (voir scripts/db-init.sql)."
 fi
 
+CREEE=0
 echo "Restauration terminée : base $CIBLE."

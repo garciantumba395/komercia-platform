@@ -132,7 +132,6 @@ def test_convert_usd_to_cdf_fractional_rate():
     assert r.exact == Decimal("2850.5") and r.amount_minor == 2851
     assert r.rounding_diff_minor == Decimal("0.5")
     # 0,01 USD = 28,505 FC -> 29
-    assert convert_minor(1, USD, CDF, Decimal("2850.5")).amount_minor == 29 - 0 or True
     r = convert_minor(1, USD, CDF, Decimal("2850.5"))
     assert r.exact == Decimal("28.505") and r.amount_minor == 29
 
@@ -153,8 +152,8 @@ def test_convert_huge_amount_is_exact():
     r = convert_minor(big, CDF, USD, "2800")
     assert r.amount_minor == (big * 100) // 2800 + (1 if (big * 100) % 2800 * 2 >= 2800 else 0)
     # retour : pas de perte de précision sur un entier gigantesque
-    r2 = convert_minor(10**30 * 2800, USD, CDF, "2800")
-    assert r2.amount_minor == 10**30 * 28 * 10**3 * 28 // 1 // 28 // 1 * 100 // 100 or True
+    r2 = convert_minor(10**30, USD, CDF, "2800")  # 10^28 USD = 2,8 x 10^31 FC
+    assert r2.amount_minor == 28 * 10**30 and r2.rounding_diff_minor == 0
     assert convert_minor(10**25, USD, CDF, "1").amount_minor == 10**23
 
 
@@ -169,7 +168,7 @@ def test_convert_extreme_rates(rate):
 
 
 def test_convert_extreme_rate_values():
-    assert convert_minor(1, CDF, USD, "0.0001").amount_minor == 10000 * 100 // 1  # 1 FC = 10 000 USD
+    assert convert_minor(1, CDF, USD, "0.0001").amount_minor == 1_000_000  # 1 FC = 10 000 USD
     assert convert_minor(100, USD, CDF, "9999999999.9999").amount_minor == 10000000000  # arrondi
 
 
@@ -212,8 +211,8 @@ def test_payment_partial():
     p = compute_payment(10000, USD, [(2000, USD)], RATE, USD)
     assert p.paid_minor == 2000 and p.remaining_minor == 8000 and not p.is_fully_paid
     assert p.change_minor == 0
-    p = compute_payment(100000, CDF, [(28000, CDF), (10, USD)], RATE, CDF)  # 28 000 + 10 USD = 28 000
-    assert p.paid_minor == 56000 - 0 and p.remaining_minor == 44000
+    p = compute_payment(100000, CDF, [(28000, CDF), (1000, USD)], RATE, CDF)  # 28 000 FC + 10 USD (28 000 FC)
+    assert p.paid_minor == 56000 and p.remaining_minor == 44000
 
 
 def test_payment_no_payment():
@@ -228,7 +227,7 @@ def test_payment_overpaid_cdf_change_in_usd():
     p = compute_payment(25000, CDF, [(50000, CDF)], RATE, USD)
     assert p.overpaid_minor == 25000 and p.remaining_minor == 0
     assert p.change_minor == 893 and p.change_currency == "USD"
-    assert p.change_rounding_diff_minor == Decimal(893) - Decimal(2500000) / Decimal(2800)
+    assert abs(p.change_rounding_diff_minor - Decimal("0.142857142857")) < Decimal("1e-11")
 
 
 def test_payment_overpaid_usd_change_in_cdf():

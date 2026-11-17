@@ -14,6 +14,15 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation, localcontext
 
 # Précision de calcul très large : aucun montant réaliste ne peut être tronqué.
 _PRECISION = 80
+# Les valeurs exactes et écarts exposés sont ramenés à 12 décimales (lisibles, stockables) ; les
+# décisions d'arrondi, elles, sont prises sur la valeur en pleine précision.
+_EXPOSED = Decimal(1).scaleb(-12)
+
+
+def _expose(value: Decimal) -> Decimal:
+    with localcontext() as ctx:
+        ctx.prec = _PRECISION
+        return value.quantize(_EXPOSED, rounding=ROUND_HALF_UP)
 
 
 class MoneyError(ValueError):
@@ -135,18 +144,10 @@ class ConversionResult:
     rounding_diff_minor: Decimal  # amount_minor - exact (positif : arrondi à la hausse)
 
 
-def convert_minor(
-    amount_minor: int,
-    from_currency: Currency | str,
-    to_currency: Currency | str,
-    rate_cdf_per_usd: str | Decimal,
-) -> ConversionResult:
-    """Convertit un montant entre CDF et USD ; arrondi ROUND_HALF_UP dans la devise cible."""
-    src, dst = get_currency(from_currency), get_currency(to_currency)
-    _check_minor(amount_minor)
+def _convert_full(amount_minor: int, src: Currency, dst: Currency, rate_cdf_per_usd) -> Decimal:
+    """Valeur exacte (pleine précision) du montant converti, en unité mineure de ``dst``."""
     if src.code == dst.code:
-        exact = Decimal(amount_minor)
-        return ConversionResult(amount_minor, exact, Decimal(0))
+        return Decimal(amount_minor)
     if {src.code, dst.code} != {RATE_BASE, RATE_QUOTE}:
         raise UnsupportedCurrency(f"Conversion non supportée : {src.code} -> {dst.code}")
     rate = check_rate(rate_cdf_per_usd)
@@ -154,11 +155,27 @@ def convert_minor(
     with localcontext() as ctx:
         ctx.prec = _PRECISION
         if src.code == RATE_QUOTE:  # CDF -> USD : multiplier avant de diviser
-            exact = Decimal(amount_minor) * base.factor / (rate * quote.factor)
-        else:  # USD -> CDF
-            exact = Decimal(amount_minor) * rate * quote.factor / base.factor
-        rounded = _round_half_up(exact)
-        return ConversionResult(rounded, exact, Decimal(rounded) - exact)
+            return Decimal(amount_minor) * base.factor / (rate * quote.factor)
+        return Decimal(amount_minor) * rate * quote.factor / base.factor  # USD -> CDF
+
+
+def convert_minor(
+    amount_minor: int,
+    from_currency: Currency | str,
+    to_currency: Currency | str,
+    rate_cdf_per_usd: str | Decimal,
+) -> ConversionResult:
+    """Convertit un montant entre CDF et USD ; arrondi ROUND_HALF_UP dans la devise cible.
+
+    ``exact`` et ``rounding_diff_minor`` sont exposés à 12 décimales ; ``amount_minor`` est arrondi
+    sur la valeur en pleine précision (80 chiffres).
+    """
+    src, dst = get_currency(from_currency), get_currency(to_currency)
+    _check_minor(amount_minor)
+    full = _convert_full(amount_minor, src, dst, rate_cdf_per_usd)
+    rounded = _round_half_up(full)
+    exact = _expose(full)
+    return ConversionResult(rounded, exact, Decimal(rounded) - exact)
 
 
 @dataclass(frozen=True)
@@ -201,9 +218,9 @@ def compute_payment(
         _check_minor(amount, "paiement")
         if amount < 0:
             raise MoneyError("Un paiement ne peut pas être négatif.")
-        exact_paid += convert_minor(amount, currency, sale_cur, rate_cdf_per_usd).exact
+        exact_paid += _convert_full(amount, get_currency(currency), sale_cur, rate_cdf_per_usd)
     paid = _round_half_up(exact_paid)
-    paid_diff = Decimal(paid) - exact_paid
+    paid_diff = Decimal(paid) - _expose(exact_paid)
 
     remaining = max(total_minor - paid, 0)
     overpaid = max(paid - total_minor, 0)

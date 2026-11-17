@@ -95,7 +95,7 @@ jobs:
         # Garde-fou (ADR 0001, règle 5) : un renommage ou une suppression accidentelle des tests
         # d'isolation ne doit pas faire passer la CI au vert sans qu'ils tournent.
         run: |
-          uv run pytest --collect-only -q -k isolation | tee /tmp/isolation-collect.txt
+          uv run pytest -o addopts="" --collect-only -q -k isolation | tee /tmp/isolation-collect.txt
           COUNT=$(grep -c '::' /tmp/isolation-collect.txt || true)
           echo "Tests d'isolation collectés : ${COUNT}"
           if [ "${COUNT}" -lt 6 ]; then
