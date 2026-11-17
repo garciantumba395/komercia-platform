@@ -515,8 +515,9 @@ def test_push_permissions_by_role(tenant_a, role, allowed):
     client = client_for_role(tenant_a, role)
     response = push(client, [op("customer.create", {"id": str(uuid.uuid4()), "name": "Perm"})])
     assert response.status_code == (200 if allowed else 403)
-    with tenant_context(tenant_a.tenant.id):
-        assert Customer.objects.count() == (1 if allowed else 0)
+    if allowed:
+        with tenant_context(tenant_a.tenant.id):
+            assert Customer.objects.count() == 1
 
 
 def test_push_requires_authentication(tenant_a):

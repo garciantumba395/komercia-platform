@@ -293,3 +293,4 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 .detail-grid dt { color: var(--muted, #5b665f); font-size: .9rem; }
 .detail-grid dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 .row-card.clickable { cursor: pointer; }
+.struck { text-decoration: line-through; color: var(--muted); }

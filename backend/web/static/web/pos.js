@@ -66,6 +66,7 @@
         view.appendChild(h('p', null, 'Demandez au propriétaire ou au gérant de saisir le taux (menu « Taux de change »).'));
         return null;
       }
+      view.appendChild(h('p', { class: 'hint' }, 'Vous pouvez aussi le gérer dans la page ', h('a', { href: '/app/taux/' }, 'Taux de change'), '.'));
       const rate = h('input', { type: 'text', inputmode: 'decimal', placeholder: '2800', required: true });
       const err = h('div');
       const btn = h('button', { type: 'submit', class: 'btn btn-big' }, 'Enregistrer le taux');
@@ -95,7 +96,8 @@
     async function checkSession() {
       clear(view).appendChild(h('p', null, 'Chargement de la caisse…'));
       try {
-        S.session = await api('sales/cash-sessions/current/?store=' + encodeURIComponent(ctx.store.id));
+        S.session = await currentSession();
+        if (!S.session) return renderOpenSession();
       } catch (e) {
         if (e instanceof K.ApiError && e.status === 404 && e.data) { S.session = null; return renderOpenSession(); }
         clear(view).append(
@@ -104,6 +106,18 @@
         return null;
       }
       return startPos();
+    }
+
+    /** Session ouverte de l'utilisateur : la liste évite le 404 (bruit en console) quand aucune caisse n'est ouverte. */
+    async function currentSession() {
+      try {
+        const data = await api('sales/cash-sessions/?status=open&store=' + encodeURIComponent(ctx.store.id));
+        const rows = Array.isArray(data) ? data : data.results || [];
+        return rows.find((x) => x.status === 'open' && (!ctx.me || x.cashier === ctx.me.id)) || null;
+      } catch (e) {
+        if (e instanceof K.ApiError && (e.status === 403 || e.status === 404)) return api('sales/cash-sessions/current/?store=' + encodeURIComponent(ctx.store.id));
+        throw e;
+      }
     }
 
     function renderOpenSession() {
@@ -138,6 +152,7 @@
 
     /* ----- 3. Caisse ----- */
     function resetSale() {
+      S.currency = (ctx.tenant && ctx.tenant.base_currency) || 'CDF';
       S.cart = [];
       S.customer = null;
       S.mode = 'cash';
@@ -602,7 +617,8 @@
             S.clientId = null;
             cartError.appendChild(errorBox(e.message + ' Le panier a changé depuis la dernière tentative : vérifiez la liste des ventes du jour puis réessayez.'));
           } else {
-            cartError.appendChild(errorBox(e.message));
+            cartError.appendChild(errorBox(/autorisation/i.test(e.message)
+              ? e.message + ' Réduisez la remise (un caissier a un plafond) ou demandez à un gérant d’encaisser.' : e.message));
             if (/taux de change/i.test(e.message)) {
               cartError.appendChild(h('a', { class: 'btn btn-secondary', href: '/app/taux/' }, 'Saisir le taux de change'));
             }
@@ -611,6 +627,7 @@
             }
           }
           refresh();
+          if (cartError.scrollIntoView) cartError.scrollIntoView({ block: 'center', behavior: 'smooth' });
         }
       }
 

@@ -8,7 +8,13 @@
   const PAGE_ROOT = /^https?:\/\/[^/]+\/api\/v1\//;
 
   const UNITS = [['piece', 'Pièce'], ['kg', 'Kilogramme'], ['litre', 'Litre'], ['box', 'Boîte'], ['meter', 'Mètre'], ['other', 'Autre']];
-  const unitLabel = (u) => (UNITS.find((x) => x[0] === u) || [0, u])[1].toLowerCase();
+  /** Unité abrégée, accordée au nombre : « 1 pièce », « 10 pièces », « 8 kg », « 5 L ». */
+  function unitLabel(u, qty) {
+    const plural = Math.abs(parseFloat(qty)) > 1;
+    const map = { piece: ['pièce', 'pièces'], box: ['boîte', 'boîtes'], kg: ['kg', 'kg'], litre: ['L', 'L'], meter: ['m', 'm'], other: ['', ''] };
+    const pair = map[u];
+    return pair ? pair[plural ? 1 : 0] : String(u || '');
+  }
   const KIND_LABELS = { in: 'Entrée', out: 'Sortie', adjustment: 'Ajustement', sale: 'Vente', return: 'Retour' };
 
   const unavailable = (e) => e instanceof K.ApiError && e.status === 404 && !e.data;
@@ -220,7 +226,7 @@
       const status = qty <= 0 ? h('span', { class: 'badge badge-danger' }, 'Rupture') : l.is_low ? h('span', { class: 'badge badge-warn' }, 'Stock bas') : null;
       return h('div', { class: 'row-card' },
         h('div', { class: 'main' }, h('div', { class: 'title' }, l.product_name, ' ', status), h('div', { class: 'sub' }, l.sku + ' · seuil minimum ' + fmtQty(l.min_stock))),
-        h('div', { class: 'amount' }, fmtQty(l.quantity) + ' ' + unitLabel(l.unit)),
+        h('div', { class: 'amount' }, (fmtQty(l.quantity) + ' ' + unitLabel(l.unit, l.quantity)).trim()),
         withAction && canWrite ? h('button', { type: 'button', class: 'btn btn-secondary btn-small', onclick: () => movementForm({ id: l.product, name: l.product_name }) }, 'Mouvement') : null);
     }
     function renderLevels() {
@@ -250,7 +256,8 @@
           h('div', { class: 'amount' }, (parseFloat(m.quantity) > 0 ? '+' : '') + fmtQty(m.quantity)))));
       } catch (e) { content.appendChild(errorBox(e.message)); }
     }
-    const show = (id) => { current = id; ({ levels: showLevels, alerts: showAlerts, history: showHistory })[id](); };
+    const filterBar = h('div', { class: 'toolbar' }, h('div', { class: 'grow' }, filter));
+    const show = (id) => { current = id; filterBar.hidden = id !== 'levels'; ({ levels: showLevels, alerts: showAlerts, history: showHistory })[id](); };
 
     function movementForm(product) {
       K.openModal('Mouvement de stock', (body, close) => {
@@ -294,6 +301,7 @@
             err.appendChild(errorBox(kind.value === 'adjustment' ? 'Saisissez une variation non nulle (ex. 5 ou -3).' : 'Saisissez une quantité positive.'));
             return;
           }
+          if (kind.value !== 'in' && !reason.value.trim()) { err.appendChild(errorBox('Le motif est obligatoire pour une sortie ou un ajustement (ex. : casse, inventaire).')); reason.focus(); return; }
           const payload = { product: chosen.id, store: ctx.store.id, kind: kind.value, quantity: raw, reason: reason.value.trim(), reference: ref.value.trim() };
           if (kind.value === 'in' && cost.value.trim()) {
             let currency = chosen.currency;
@@ -320,7 +328,7 @@
     const bar = tabs([['levels', 'Niveaux'], ['alerts', 'Alertes'], ['history', 'Historique']], show);
     view.append(
       canWrite ? h('div', { class: 'btn-row', style: 'margin-bottom:.8rem' }, h('button', { type: 'button', class: 'btn', onclick: () => movementForm(null) }, '+ Entrée de stock')) : null,
-      bar, h('div', { class: 'toolbar' }, h('div', { class: 'grow' }, filter)), content);
+      bar, filterBar, content);
     filter.addEventListener('input', () => { if (current === 'levels') renderLevels(); });
     await showLevels();
   };
@@ -392,14 +400,19 @@
         const method = K.select([['cash', 'Espèces'], ['mobile_money', 'Mobile Money'], ['other', 'Autre']], 'cash');
         const note = h('input', { type: 'text', placeholder: 'Note (facultatif)' });
         const err = h('div');
+        const payAll = h('button', { type: 'button', class: 'btn btn-secondary btn-small', onclick: () => { amount.value = toInput(bal[cur.value], cur.value); amount.focus(); } });
+        const syncPayAll = () => { payAll.textContent = 'Solder : ' + fmt(bal[cur.value], cur.value); };
+        cur.addEventListener('change', syncPayAll);
+        syncPayAll();
         const btn = h('button', { type: 'submit', class: 'btn btn-block' }, 'Encaisser le paiement');
         const form = h('form', { class: 'card', novalidate: true }, h('h3', null, 'Encaisser une dette'), err,
-          h('div', { class: 'grid-2' }, field('Montant', amount), field('Devise', cur)), field('Mode de paiement', method), field('Note', note), btn);
+          h('div', { class: 'grid-2' }, field('Montant', amount), field('Devise', cur)), h('div', { class: 'btn-row', style: 'margin-bottom:.7rem' }, payAll), field('Mode de paiement', method), field('Note', note), btn);
         form.addEventListener('submit', async (e) => {
           e.preventDefault();
           clear(err);
           const v = parseAmount(amount.value, cur.value);
           if (!v) { err.appendChild(errorBox('Saisissez un montant valide.')); return; }
+          if (v > (bal[cur.value] || 0)) { err.appendChild(errorBox('Le montant dépasse la dette (' + fmt(bal[cur.value] || 0, cur.value) + ').')); return; }
           await busy(btn, async () => {
             try {
               await api('customers/customers/' + customer.id + '/payments/', { method: 'POST', body: { amount_minor: v, currency: cur.value, method: method.value, note: note.value.trim() } });
@@ -582,16 +595,60 @@
         h('div', { class: 'kpi' }, h('div', { class: 'k' }, 'Ventes'), h('div', { class: 'v' }, String(count))),
         h('div', { class: 'kpi' }, h('div', { class: 'k' }, 'Chiffre d’affaires'), h('div', { class: 'v' }, fmtMap(totals)))));
       if (!sales.length) { list.appendChild(h('div', { class: 'empty' }, 'Aucune vente ce jour-là.')); return; }
+      const names = await customerNames(sales);
       sales.forEach((s) => {
         const cancelled = isCancelled(s);
-        list.appendChild(h('div', { class: 'row-card' },
-          h('div', { class: 'main' },
-            h('div', { class: 'title' }, 'Vente ' + (s.number || ''), ' ', cancelled ? h('span', { class: 'badge badge-danger' }, 'Annulée') : null, s.credit_minor ? h('span', { class: 'badge badge-warn' }, 'Crédit') : null),
-            h('div', { class: 'sub' }, [s.created_at ? fmtDateTime(s.created_at).slice(-5) : '', s.customer_name || ''].filter(Boolean).join(' · '))),
-          h('div', { class: 'amount' }, fmt(s.total_minor, s.currency)),
-          h('div', { class: 'btn-row' },
-            h('button', { type: 'button', class: 'btn btn-secondary btn-small', onclick: () => K.printReceipt(s.id) }, 'Reçu'),
-            canCancel && !cancelled ? h('button', { type: 'button', class: 'btn btn-danger-outline btn-small', onclick: () => cancel(s) }, 'Annuler') : null)));
+        const who = s.customer_name || names[s.customer] || '';
+        list.appendChild(h('div', { class: 'row-card clickable', tabindex: '0', role: 'button', 'aria-label': 'Ouvrir la vente ' + (s.number || ''),
+          onclick: () => detail(s, who), onkeydown: (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) detail(s, who); } },
+        h('div', { class: 'main' },
+          h('div', { class: 'title' }, 'Vente ' + (s.number || ''), ' ', cancelled ? h('span', { class: 'badge badge-danger' }, 'Annulée') : null, s.credit_minor && !cancelled ? h('span', { class: 'badge badge-warn' }, 'Crédit') : null),
+          h('div', { class: 'sub' }, [s.created_at ? fmtDateTime(s.created_at).slice(-5) : '', who].filter(Boolean).join(' · '))),
+        h('div', { class: 'amount' + (cancelled ? ' struck' : '') }, fmt(s.total_minor, s.currency)),
+        h('div', { class: 'btn-row' },
+          h('button', { type: 'button', class: 'btn btn-secondary btn-small', onclick: (e) => { e.stopPropagation(); K.printReceipt(s.id); } }, 'Reçu'),
+          canCancel && !cancelled ? h('button', { type: 'button', class: 'btn btn-danger-outline btn-small', onclick: (e) => { e.stopPropagation(); cancel(s); } }, 'Annuler') : null)));
+      });
+    }
+
+    let customerCache = null;
+    async function customerNames(sales) {
+      if (!sales.some((s) => s.customer && !s.customer_name)) return {};
+      if (!customerCache) {
+        customerCache = {};
+        try { (await K.listAll('customers/customers/', 10)).forEach((c) => { customerCache[c.id] = c.name; }); } catch (e) { /* le nom du client est un confort */ }
+      }
+      return customerCache;
+    }
+
+    function detail(s, who) {
+      const cancelled = isCancelled(s);
+      K.openModal('Vente ' + (s.number || ''), (body, close) => {
+        const row = (k, v) => (v === null || v === undefined || v === '' ? null : [h('dt', null, k), h('dd', null, v)]);
+        const payLabel = { cash: 'Espèces', mobile_money: 'Mobile Money', other: 'Autre' };
+        body.appendChild(h('dl', { class: 'detail-grid' },
+          row('Date', fmtDateTime(s.created_at)), row('Client', who), row('Caissier', ctx.me && s.cashier === ctx.me.id ? 'Vous' : null),
+          row('Statut', cancelled ? 'Annulée' : 'Validée'),
+          row('Taux appliqué', s.rate_cdf_per_usd ? '1 $ = ' + fmt(Math.round(parseFloat(s.rate_cdf_per_usd)), 'CDF') + (parseFloat(s.rate_cdf_per_usd) % 1 ? ' (' + parseFloat(s.rate_cdf_per_usd) + ')' : '') : null)));
+        if (cancelled) {
+          body.appendChild(K.alertBox('Vente annulée' + (s.cancelled_at ? ' le ' + fmtDateTime(s.cancelled_at) : '') + (s.cancel_reason ? ' — motif : ' + s.cancel_reason : '') + '.', 'warn'));
+        }
+        body.appendChild(h('div', { class: 'table-wrap' }, h('table', null,
+          h('thead', null, h('tr', null, h('th', null, 'Article'), h('th', { class: 'num' }, 'Qté'), h('th', { class: 'num' }, 'Total'))),
+          h('tbody', null, (s.items || []).map((it) => h('tr', null,
+            h('td', null, it.name || '', it.discount_minor ? h('div', { class: 'hint' }, 'Remise : −' + fmt(it.discount_minor, s.currency)) : null),
+            h('td', { class: 'num' }, fmtQty(it.quantity)), h('td', { class: 'num' }, fmt(it.line_total_minor, s.currency))))))));
+        const lines = [];
+        if (s.discount_minor) lines.push(['Remise globale', '−' + fmt(s.discount_minor, s.currency)]);
+        lines.push(['Total', fmt(s.total_minor, s.currency)]);
+        (s.payments || []).forEach((p) => lines.push(['Payé (' + (payLabel[p.method] || p.method) + ')', fmt(p.amount_minor, p.currency)]));
+        if (s.change_minor) lines.push(['Monnaie rendue', fmt(s.change_minor, s.change_currency || s.currency)]);
+        if (s.credit_minor) lines.push(['Mis à crédit', fmt(s.credit_minor, s.currency)]);
+        body.appendChild(h('dl', { class: 'detail-grid', style: 'margin-top:.8rem' }, lines.map(([k, v]) => [h('dt', null, k), h('dd', null, v)])));
+        body.appendChild(h('div', { class: 'btn-row' },
+          h('button', { type: 'button', class: 'btn btn-secondary', onclick: () => K.printReceipt(s.id) }, 'Réimprimer le reçu'),
+          canCancel && !cancelled ? h('button', { type: 'button', class: 'btn btn-danger-outline', onclick: () => { close(); cancel(s); } }, 'Annuler la vente') : null,
+          h('button', { type: 'button', class: 'btn btn-ghost', onclick: close }, 'Fermer')));
       });
     }
 
@@ -600,7 +657,7 @@
         const reason = h('input', { type: 'text', required: true, placeholder: 'Ex. : erreur de saisie, client a renoncé' });
         const err = h('div');
         const btn = h('button', { type: 'submit', class: 'btn btn-danger btn-block' }, 'Annuler cette vente');
-        const form = h('form', { novalidate: true }, h('p', null, 'L’annulation remet le stock et corrige la caisse. Elle ne peut pas être défaite.'), err, field('Motif (obligatoire)', reason), btn);
+        const form = h('form', { novalidate: true }, h('p', null, 'L’annulation remet le stock' + (s.credit_minor ? ', annule la dette du client' : '') + ' et corrige la caisse. Elle ne peut pas être défaite.'), err, field('Motif (obligatoire)', reason), btn);
         form.addEventListener('submit', async (e) => {
           e.preventDefault();
           clear(err);
@@ -674,7 +731,7 @@
         else stockBox.appendChild(K.alertBox(rows.length + ' produit(s) sous le seuil minimum.', 'warn'));
         rows.slice(0, 8).forEach((l) => stockBox.appendChild(h('div', { class: 'row-card' },
           h('div', { class: 'main' }, h('div', { class: 'title' }, l.product_name), h('div', { class: 'sub' }, 'Seuil : ' + fmtQty(l.min_stock))),
-          parseFloat(l.quantity) <= 0 ? h('span', { class: 'badge badge-danger' }, 'Rupture') : h('span', { class: 'badge badge-warn' }, fmtQty(l.quantity) + ' ' + unitLabel(l.unit)))));
+          parseFloat(l.quantity) <= 0 ? h('span', { class: 'badge badge-danger' }, 'Rupture') : h('span', { class: 'badge badge-warn' }, (fmtQty(l.quantity) + ' ' + unitLabel(l.unit, l.quantity)).trim()))));
       } catch (e) { stockBox.appendChild(errorBox(e.message)); }
     }
 
