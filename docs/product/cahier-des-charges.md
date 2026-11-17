@@ -539,9 +539,9 @@ Les points suivants sont à valider avec un conseil juridique local avant le lan
 
 | Sujet | Options | Recommandation | Statut |
 |---|---|---|---|
-| Application Android | Native (Kotlin) ou multiplateforme (Flutter, React Native) | Multiplateforme si l'équipe est réduite ; native si une compétence Android solide existe. Valider par un prototype de la caisse hors ligne. | À décider |
-| Stack backend | TypeScript, Python ou autre, sur PostgreSQL | Choisir selon la compétence de l'équipe ; l'architecture visée est un monolithe modulaire. | À décider |
-| Synchronisation hors ligne | Solution du marché ou développement sur mesure | Mener une étude technique courte sur un cas simple (ventes et stock) avant de choisir. | À décider |
+| Application Android | Native (Kotlin) ou multiplateforme (Flutter, React Native) | Flutter avec base locale SQLite chiffrée. Prototype de 1 à 2 semaines (vente hors ligne, impression Bluetooth, synchronisation) ; repli sur Kotlin natif en cas d'échec. Voir `docs/adr/0001-choix-de-la-stack.md`. | Décidé, prototype à réaliser |
+| Stack backend | Python, TypeScript ou autre, sur PostgreSQL | Python avec Django et Django REST Framework, PostgreSQL avec Row-Level Security, Celery et Redis. Monolithe modulaire. Voir `docs/adr/0001-choix-de-la-stack.md`. | Décidé |
+| Synchronisation hors ligne | Solution du marché ou développement sur mesure | Journal d'opérations sur mesure par défaut ; étude technique courte sur un cas simple (ventes et stock) avant de s'y engager, avec une solution du marché comme alternative. | Proposé |
 | Mobile Money | Agrégateur unique ou intégrations directes | Commencer par un agrégateur agréé couvrant la RDC ; intégrations directes plus tard si le volume le justifie. | À décider |
 | Hébergement | Région cloud proche de la RDC ou en Europe | Retenir la région offrant la meilleure latence tout en respectant la section 20. | À décider |
 | Imprimante thermique | Bluetooth, USB ou impression via application tierce | Privilégier Bluetooth avec le protocole ESC/POS, testé sur les modèles courants du marché. | À décider |
