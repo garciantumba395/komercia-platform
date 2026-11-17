@@ -11,7 +11,7 @@ from core.tenancy import tenant_context
 
 pytestmark = pytest.mark.django_db
 STORES = "/api/v1/stores/"
-MEMBERS = "/api/v1/members/"
+MEMBERS = "/api/v1/users/"
 
 
 def entries(handle, action=None):
