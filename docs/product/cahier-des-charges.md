@@ -1,7 +1,10 @@
 # Cahier des charges — Komersia
 
-> Version 1.0 — base de référence du dépôt `komersia-platform`.
-> Les exigences sont identifiées par un code, priorisées (P0 à P3) et rédigées de façon testable.
+> Version 1.1 — base de référence du dépôt `komersia-platform`.
+> Les exigences sont identifiées par un code, priorisées et rédigées de façon testable.
+> **Priorités :** P0 = indispensable au MVP · P1 = important, juste après le MVP · P2 = évolution · P3 = long terme.
+> **Statut des chiffres :** les valeurs marquées *(hypothèse)* sont à valider avec les commerçants pilotes avant toute décision.
+> Les sections 16 à 23 complètent la v1.0 : modèle économique, jalons, règles métier, permissions, conformité et décisions ouvertes.
 
 ## 1. Présentation du projet
 
@@ -47,7 +50,7 @@ Komersia fournit un socle commun de gestion, adaptable à tous les secteurs grâ
 
 ## 3. Périmètre du MVP
 
-Le MVP doit permettre à un commerçant de démarrer et gérer son activité de manière autonome.
+Le MVP doit permettre à un commerçant de démarrer et gérer son activité de manière autonome. Il est livré par jalons successifs (voir section 17).
 
 | Priorité | Fonctionnalité | Description |
 |---|---|---|
@@ -80,6 +83,9 @@ Le MVP doit permettre à un commerçant de démarrer et gérer son activité de 
 | KOM-004 | Le système doit permettre de définir les rôles : propriétaire, gérant, caissier, magasinier et comptable. | P0 |
 | KOM-005 | Le propriétaire doit pouvoir inviter, désactiver ou supprimer un utilisateur. | P0 |
 | KOM-006 | Chaque utilisateur doit accéder uniquement aux données de son entreprise. | P0 |
+| KOM-007 | L'utilisateur doit pouvoir vérifier son numéro de téléphone par code OTP (SMS/WhatsApp) et réinitialiser son mot de passe. | P0 |
+| KOM-008 | Le caissier doit pouvoir se connecter rapidement sur la caisse par code PIN, après une première authentification de l'appareil. | P0 |
+| KOM-009 | Le propriétaire doit pouvoir voir et révoquer les appareils et sessions actifs, et activer une double authentification pour son compte. | P1 |
 
 ### 4.2 Catalogue produits et services
 
@@ -104,6 +110,8 @@ Le MVP doit permettre à un commerçant de démarrer et gérer son activité de 
 | KOM-025 | Le caissier doit pouvoir appliquer une remise globale ou par ligne, selon ses permissions. | P0 |
 | KOM-026 | Le système doit permettre un retour, un remboursement ou une annulation avec justification. | P1 |
 | KOM-027 | Le système doit conserver l'historique complet des ventes, modifications et annulations. | P0 |
+| KOM-028 | Le caissier doit pouvoir ouvrir et clôturer une session de caisse avec fonds initial, comptage final et calcul de l'écart par moyen de paiement et par devise. | P0 |
+| KOM-029 | Le caissier doit pouvoir mettre un panier en attente et le reprendre plus tard. | P1 |
 
 ### 4.4 Paiements
 
@@ -116,6 +124,9 @@ Le MVP doit permettre à un commerçant de démarrer et gérer son activité de 
 | KOM-034 | Le système doit enregistrer chaque paiement avec le montant, la devise, le moyen, la référence et le statut. | P0 |
 | KOM-035 | Le système doit rapprocher automatiquement les paiements Mobile Money confirmés par webhook. | P0 |
 | KOM-036 | Le système doit permettre de convertir ou afficher les montants en CDF et USD. | P0 |
+| KOM-037 | Le taux de change appliqué doit être enregistré sur chaque vente et chaque paiement, et ne plus changer ensuite (voir section 18). | P0 |
+| KOM-038 | Le propriétaire ou le gérant doit pouvoir définir et historiser le taux de change CDF/USD de chaque boutique. | P0 |
+| KOM-039 | Le système doit gérer un paiement en plusieurs devises ou moyens sur une même vente, avec rendu de monnaie dans la devise choisie. | P0 |
 
 ### 4.5 Stock et achats
 
@@ -151,6 +162,32 @@ Le MVP doit permettre à un commerçant de démarrer et gérer son activité de 
 | KOM-064 | Le système doit permettre l'export des rapports en PDF, CSV ou Excel. | P1 |
 | KOM-065 | Le système doit afficher les données en temps réel ou après synchronisation hors ligne. | P0 |
 
+### 4.8 Abonnement et facturation de la plateforme
+
+Voir le modèle économique en section 16.
+
+| ID | Exigence | Priorité |
+|---|---|---|
+| KOM-070 | Le système doit gérer des plans d'abonnement configurables, avec des limites par plan (boutiques, utilisateurs, modules, volume de messages). | P1 |
+| KOM-071 | Un nouveau commerçant doit bénéficier d'un essai gratuit sans moyen de paiement enregistré. | P1 |
+| KOM-072 | Le commerçant doit pouvoir payer son abonnement par Mobile Money, et recevoir un reçu d'abonnement. | P1 |
+| KOM-073 | Le système doit envoyer des rappels avant l'échéance et appliquer une période de grâce. | P1 |
+| KOM-074 | En cas d'impayé, le système doit se dégrader progressivement (limitation de fonctions) sans jamais bloquer l'enregistrement d'une vente ni l'export des données du commerçant. | P1 |
+| KOM-075 | Le commerçant doit pouvoir changer de plan, avec calcul au prorata. | P1 |
+| KOM-076 | Le système doit gérer des codes de parrainage et attribuer chaque commerçant à un partenaire ou à un parrain. | P2 |
+| KOM-077 | Le système doit calculer les commissions des partenaires, produire un relevé mensuel et suivre leur paiement. | P2 |
+| KOM-078 | Le système doit enregistrer, pour chaque paiement Mobile Money collecté, les frais de l'opérateur ou de l'agrégateur et la commission Komersia. | P2 |
+
+### 4.9 Back-office de la plateforme
+
+| ID | Exigence | Priorité |
+|---|---|---|
+| KOM-080 | L'équipe Komersia doit disposer d'une console listant les commerçants, leur plan, leur statut et leur activité. | P1 |
+| KOM-081 | L'équipe Komersia doit pouvoir suspendre et réactiver un commerçant, avec journalisation. | P1 |
+| KOM-082 | Le support doit pouvoir consulter le compte d'un commerçant uniquement avec son consentement, et chaque accès doit être audité. | P1 |
+| KOM-083 | La console doit afficher les indicateurs de la plateforme : commerçants actifs, MRR, churn, ventes enregistrées, taux de paiements réussis. | P1 |
+| KOM-084 | Le système doit permettre d'activer des modules et des fonctions par commerçant (feature flags). | P2 |
+
 ## 5. Modules sectoriels
 
 Les modules ne remplacent pas le socle commun : ils l'étendent.
@@ -181,6 +218,16 @@ Les modules ne remplacent pas le socle commun : ils l'étendent.
 | KOM-NF-010 | Compatibilité | L'application doit fonctionner sur Android moderne, navigateurs Chrome et Firefox récents. | P0 |
 | KOM-NF-011 | Sauvegarde | Les données doivent être sauvegardées quotidiennement avec une politique de restauration testée. | P0 |
 | KOM-NF-012 | Scalabilité | L'architecture doit supporter la croissance vers plusieurs milliers de commerçants sans refonte majeure. | P1 |
+| KOM-NF-013 | Appareils | L'application Android doit fonctionner sur Android 8 ou supérieur avec 2 Go de RAM, et rester fluide sur un téléphone d'entrée de gamme. | P0 |
+| KOM-NF-014 | Réseau | L'application doit rester utilisable sur une connexion 2G/3G ou à forte latence, avec une synchronisation compressée et reprenable après coupure. | P0 |
+| KOM-NF-015 | Hors ligne | Le mode hors ligne doit tenir au moins 7 jours *(hypothèse)* sur une base locale chiffrée. | P0 |
+| KOM-NF-016 | Intégrité financière | Aucune vente ne doit être perdue ni dupliquée à la synchronisation (idempotence testée), et les montants doivent être stockés en entiers, jamais en nombres flottants. | P0 |
+| KOM-NF-017 | Reprise | La perte de données maximale (RPO) doit être de 15 minutes et le délai de reprise (RTO) de 4 heures *(hypothèse)*, avec un test de restauration chaque trimestre. | P0 |
+| KOM-NF-018 | Sécurité | Les données doivent être chiffrées au repos. Les API doivent être protégées contre l'abus (limitation de débit, détection de force brute). Un test d'intrusion doit précéder le lancement. | P0 |
+| KOM-NF-019 | Ergonomie | Une vente doit se faire en 3 écrans ou moins. Un nouveau commerçant doit pouvoir faire sa première vente en moins de 15 minutes après l'inscription. | P0 |
+| KOM-NF-020 | Internationalisation | Les textes doivent être externalisés pour permettre l'ajout de langues (lingala et swahili envisagés), et les formats de date, de nombre et de devise doivent être configurables. | P1 |
+| KOM-NF-021 | Observabilité | Les erreurs, la latence, les échecs de synchronisation et les échecs de paiement doivent être mesurés, avec des alertes pour l'équipe. | P1 |
+| KOM-NF-022 | Support | Un canal de support par WhatsApp doit exister, avec un délai de première réponse de 4 heures ouvrées *(hypothèse)*. | P1 |
 
 ## 7. Sécurité et multi-tenant
 
@@ -193,6 +240,9 @@ La sécurité multi-tenant est une exigence critique du projet.
 - Les rôles et permissions doivent être appliqués côté serveur.
 - Les opérations de suppression, annulation de vente, modification de stock et gestion des utilisateurs doivent être auditées.
 - Les clés API, secrets de paiement et identifiants Mobile Money doivent être stockés dans un gestionnaire de secrets, jamais dans le code source.
+- Les webhooks entrants (Mobile Money) doivent être authentifiés par signature et traités de façon idempotente.
+- Les tests automatisés doivent inclure des scénarios où un utilisateur du tenant A tente de lire ou modifier des données du tenant B (API, requêtes directes, exports, fichiers).
+- Les accès du support aux données d'un commerçant doivent être soumis à son consentement et journalisés.
 
 ## 8. Architecture technique
 
@@ -277,7 +327,12 @@ Le MVP est considéré comme livré lorsque les conditions suivantes sont rempli
 - Un utilisateur ne peut pas accéder aux données d'un autre commerçant.
 - Les ventes créées hors ligne se synchronisent correctement.
 - Les tests automatisés couvrent les fonctions critiques et l'isolation multi-tenant.
-- L'application est testée avec au moins 3 à 5 commerçants pilotes.
+- Une session de caisse peut être ouverte et clôturée, avec calcul de l'écart par devise.
+- Un test de synchronisation avec 1 000 ventes créées hors ligne sur plusieurs appareils ne produit ni doublon ni perte.
+- Un test d'isolation confirme qu'aucune requête d'un tenant ne retourne de donnée d'un autre tenant.
+- Un nouveau commerçant fait sa première vente en moins de 15 minutes, mesuré lors de tests utilisateurs.
+- Une restauration de sauvegarde a été réalisée avec succès dans l'environnement de test.
+- L'application est testée avec au moins 3 à 5 commerçants pilotes pendant au moins 4 semaines.
 
 ## 12. Livrables attendus
 
@@ -313,6 +368,13 @@ Le MVP est considéré comme livré lorsque les conditions suivantes sont rempli
 | Complexité excessive | Retard du lancement | MVP limité et modules progressifs |
 | Faible adoption | Croissance lente | Interface simple, formation et support WhatsApp |
 | Dépendance à un opérateur | Risque commercial | Intégration de plusieurs moyens de paiement |
+| Conflits de synchronisation (stock, doublons) | Écarts de stock, ventes dupliquées | Identifiants générés côté appareil, idempotence, journal d'opérations, règles de conflit (section 18) |
+| Fraude ou erreur en caisse | Perte d'argent | Clôture de caisse, permissions sur remises et annulations, journal d'audit |
+| Manipulation de l'heure de l'appareil hors ligne | Données incohérentes | Horodatage appareil et serveur, détection d'écart, plafond de durée hors ligne |
+| Exigences réglementaires (paiement, fiscalité, données) | Blocage ou sanction | Agrégateur agréé, validation juridique locale avant lancement (section 20) |
+| Prix trop élevé pour la clientèle cible | Faible conversion payante | Offre gratuite, tarifs testés avec les pilotes, paiement mensuel en petites sommes (section 16) |
+| Marge insuffisante sur Mobile Money | Modèle non rentable | Calculer la marge après frais de l'agrégateur avant de fixer la commission |
+| Dépendance à un fournisseur de messagerie (WhatsApp/SMS) | Coûts et interruptions | Plafonds par plan, fournisseurs alternatifs, repli par SMS |
 
 ## 15. Indicateurs de succès
 
@@ -324,7 +386,189 @@ Le MVP est considéré comme livré lorsque les conditions suivantes sont rempli
 - Nombre de ruptures de stock évitées.
 - Taux de rétention mensuelle des commerçants.
 - Note de satisfaction des utilisateurs pilotes.
+- Revenu mensuel récurrent (MRR) et revenu moyen par commerçant (ARPU).
+- Taux de conversion de l'offre gratuite vers une offre payante.
+- Taux de désabonnement (churn) mensuel.
+- Coût d'acquisition par commerçant, y compris les commissions de partenaires, rapporté à la valeur vie client (LTV).
+- Marge nette sur les paiements Mobile Money, après frais de l'agrégateur.
+- Part des commerçants actifs 7 jours après l'inscription (activation).
 
-## 16. Découpage prévu en issues GitHub
+Les cibles chiffrées seront fixées après la phase pilote.
 
-Architecture, base de données multi-tenant, authentification et rôles, catalogue, caisse/POS, stock, paiements Mobile Money, mode hors ligne, rapports, tests de sécurité.
+## 16. Modèle économique
+
+### 16.1 Principes
+
+- Trois sources de revenus : **abonnement**, **commission sur les paiements Mobile Money**, **services complémentaires**.
+- Un **partage de revenus** avec les partenaires qui apportent et accompagnent des commerçants (revendeurs, agents terrain, parrains).
+- Prix affichés en USD, payables en CDF ou en USD par Mobile Money.
+- Une offre gratuite pour favoriser l'adoption, et un essai gratuit des offres payantes.
+- Ne jamais retenir les données du commerçant en otage : l'export reste toujours possible et la caisse reste utilisable (KOM-074).
+
+### 16.2 Abonnement
+
+| Plan | Cible | Contenu indicatif | Prix mensuel *(hypothèse)* |
+|---|---|---|---|
+| Gratuit | Petit commerçant qui démarre | 1 boutique, 1 utilisateur, catalogue limité, caisse hors ligne, rapports de base | 0 USD |
+| Essentiel | Commerce de détail | 1 boutique, 3 utilisateurs, catalogue illimité, clients et crédit, Mobile Money, reçus WhatsApp/SMS limités | 5 USD |
+| Pro | Commerce établi | Jusqu'à 3 boutiques, 10 utilisateurs, achats et fournisseurs, factures et devis, exports, rapports avancés | 15 USD |
+| Business | Multi-boutiques, grossiste | Plus de boutiques et d'utilisateurs, modules sectoriels, accès API, support prioritaire | 40 USD, plus un supplément par boutique |
+
+Modalités :
+- Essai gratuit de 14 jours des plans payants, sans carte ni compte de paiement.
+- Paiement mensuel ou annuel (avec deux mois offerts *(hypothèse)*). Le Mobile Money se prête mal au prélèvement automatique : le système envoie un rappel et le commerçant valide le paiement.
+- Période de grâce de 7 jours *(hypothèse)*, puis limitation progressive des fonctions (KOM-073, KOM-074).
+- Le contenu exact des plans, les limites et les prix sont à valider par des entretiens avec les commerçants pilotes (consentement à payer, capacité de paiement).
+
+### 16.3 Partage de revenus et commissions
+
+| Mécanisme | Principe | Valeur indicative *(hypothèse)* |
+|---|---|---|
+| Commission sur paiements Mobile Money | Pourcentage sur les paiements collectés via Komersia, après frais de l'agrégateur | 0,5 à 1,5 % du montant, à fixer après calcul de la marge réelle |
+| Programme partenaires (revendeurs, agents terrain) | Commission récurrente sur les abonnements des commerçants apportés, suivie par code de parrainage | 20 à 30 % de l'abonnement pendant 12 mois |
+| Parrainage entre commerçants | Récompense pour le parrain et le filleul | 1 mois offert pour chacun |
+| Services complémentaires | Packs de messages WhatsApp/SMS, installation, formation, matériel (imprimante) | Selon catalogue |
+
+Règles :
+- Chaque commerçant est rattaché à au plus un partenaire ou parrain, de façon traçable (KOM-076).
+- Les commissions sont calculées automatiquement, visibles dans un relevé mensuel et payées après validation (KOM-077).
+- Komersia ne conserve pas les fonds des commerçants : les encaissements transitent par un agrégateur de paiement agréé (voir section 20).
+
+### 16.4 Indicateurs économiques
+
+MRR, ARPU, conversion gratuit vers payant, churn, coût d'acquisition (commissions incluses), LTV/CAC, marge sur transaction (voir section 15).
+
+## 17. Jalons et feuille de route
+
+| Jalon | Objectif | Contenu principal |
+|---|---|---|
+| M0 — Fondations | Poser le socle technique | Architecture, CI/CD, environnements, base multi-tenant avec RLS, authentification, rôles, audit |
+| M1 — Caisse hors ligne | Premier produit utilisable par les pilotes | Catalogue, caisse en espèces, multi-devises, stock, clients et crédit, clôture de caisse, rapports de base, synchronisation hors ligne, reçus imprimables |
+| M2 — Paiements et monétisation | MVP commercialisable | Mobile Money via un agrégateur, reçus WhatsApp/SMS, abonnement et essai, back-office, tests de sécurité complets, notifications |
+| M3 — Croissance | Étendre l'offre | Achats et fournisseurs, factures et devis, multi-boutiques, inventaire, programme partenaires et parrainage, commissions |
+| M4 — Modules | Spécialiser par secteur | Modules sectoriels, fidélité, export comptable |
+
+Le MVP commercialisable correspond à M0 + M1 + M2. La phase pilote démarre dès la fin de M1 afin de valider l'ergonomie et le hors ligne avant d'investir dans les paiements.
+
+## 18. Règles métier détaillées
+
+### 18.1 Montants et devises
+- Tous les montants sont stockés en entiers, dans la plus petite unité de la devise, avec le code de la devise.
+- Chaque boutique a une devise de référence et un taux CDF/USD défini manuellement par le commerçant, historisé (KOM-038). Une source externe pourra être proposée plus tard.
+- Chaque vente et chaque paiement enregistrent la devise, le montant, le taux appliqué et la date du taux. Ces valeurs ne sont plus modifiées ensuite.
+- Un paiement peut mélanger plusieurs devises et moyens ; le rendu de monnaie se fait dans la devise choisie par le caissier (KOM-039).
+- Règles d'arrondi : CDF à l'unité, USD au centime. L'écart d'arrondi est enregistré.
+
+### 18.2 Ventes
+- Une vente validée est immuable. Une annulation ou un retour crée une écriture inverse, liée à la vente d'origine, avec justification et auteur. Aucune suppression.
+- La numérotation des reçus est séquentielle par appareil et par boutique, avec un préfixe d'appareil pour éviter les collisions hors ligne.
+- Les taxes (TVA) sont configurables par boutique, avec prix saisis hors taxe ou toutes taxes comprises.
+
+### 18.3 Crédit client
+- Chaque client a une limite de crédit. Un dépassement exige l'autorisation d'un rôle habilité (KOM-053).
+- Une dette reste dans la devise de la vente d'origine ; le commerçant choisit s'il la réévalue.
+- Par défaut, un paiement s'impute à la dette la plus ancienne.
+
+### 18.4 Stock
+- Le coût d'achat est calculé en coût moyen pondéré.
+- La vente d'un produit sans stock suffisant est autorisée ou refusée selon un réglage par boutique. Une vente déjà faite hors ligne n'est jamais refusée à la synchronisation : le stock peut devenir négatif et une alerte est émise.
+- Un transfert entre boutiques se fait en deux étapes : expédié, puis reçu.
+
+### 18.5 Hors ligne et synchronisation
+- Les identifiants (UUID) sont générés sur l'appareil, ce qui rend la synchronisation idempotente.
+- L'appareil tient un journal d'opérations rejoué vers le serveur dans l'ordre. Une opération déjà reçue est ignorée.
+- Les ventes et paiements ne sont jamais écrasés. Pour les fiches (client, produit), la dernière modification gagne, sauf sur les champs sensibles (prix d'achat, limite de crédit) qui sont signalés pour validation.
+- L'horodatage de l'appareil et celui du serveur sont tous deux conservés ; un écart important est signalé.
+- Au-delà de la durée maximale hors ligne (KOM-NF-015), l'application demande une synchronisation avant de continuer.
+
+### 18.6 Paiements Mobile Money
+- Statuts : initié, en attente, confirmé, échoué, expiré, remboursé.
+- Un webhook est vérifié par signature et traité de façon idempotente. En l'absence de webhook, le système interroge l'agrégateur après un délai.
+- Un rapprochement quotidien compare les paiements enregistrés au relevé de l'agrégateur, et signale les écarts.
+- Une vente payée par Mobile Money n'est validée qu'à la confirmation du paiement, sauf règle contraire du commerçant.
+
+## 19. Matrice des permissions
+
+✔ = autorisé · — = interdit · seuil = autorisé jusqu'à un seuil fixé par le propriétaire.
+
+| Action | Propriétaire | Gérant | Caissier | Magasinier | Comptable |
+|---|---|---|---|---|---|
+| Enregistrer une vente | ✔ | ✔ | ✔ | — | — |
+| Appliquer une remise | ✔ | ✔ | seuil | — | — |
+| Annuler ou rembourser une vente | ✔ | ✔ | — | — | — |
+| Modifier un prix de vente | ✔ | ✔ | — | — | — |
+| Voir les prix d'achat et les marges | ✔ | ✔ | — | ✔ | ✔ |
+| Ajuster le stock | ✔ | ✔ | — | ✔ | — |
+| Faire un inventaire et réceptionner | ✔ | ✔ | — | ✔ | — |
+| Gérer les clients | ✔ | ✔ | ✔ | — | — |
+| Modifier une limite de crédit | ✔ | ✔ | — | — | — |
+| Clôturer une caisse | ✔ | ✔ | ✔ (sa session) | — | — |
+| Voir les rapports complets | ✔ | ✔ | — | — | ✔ |
+| Exporter les données | ✔ | ✔ | — | — | ✔ |
+| Gérer les utilisateurs | ✔ | — | — | — | — |
+| Gérer l'abonnement et la facturation | ✔ | — | — | — | — |
+
+## 20. Conformité et cadre réglementaire
+
+Les points suivants sont à valider avec un conseil juridique local avant le lancement commercial.
+
+| Domaine | Point d'attention |
+|---|---|
+| Paiements | Le traitement des fonds relève d'acteurs agréés par la Banque centrale du Congo. Komersia doit passer par un agrégateur ou un opérateur agréé, et ne pas détenir les fonds des commerçants. |
+| Fiscalité | Reçus, factures et TVA doivent respecter les règles de l'administration fiscale congolaise (taux de TVA en vigueur à vérifier). L'intégration fiscale automatisée est hors périmètre du MVP. |
+| Données personnelles | Respecter le cadre congolais applicable (notamment le Code du numérique de 2023, à vérifier) : information et consentement, droit d'accès et de suppression, durée de conservation, localisation de l'hébergement. |
+| Messagerie | Obtenir le consentement des clients avant les messages WhatsApp ou SMS, et permettre de s'y opposer. |
+| Contrats | Rédiger les conditions générales d'utilisation, la politique de confidentialité et les conditions du programme partenaires. |
+| Conservation | Définir la durée de conservation des ventes, paiements et journaux d'audit. |
+
+## 21. Glossaire
+
+| Terme | Définition |
+|---|---|
+| Tenant | Un commerçant (entreprise) isolé des autres dans la plateforme |
+| Boutique | Point de vente rattaché à un tenant |
+| Session de caisse | Période entre l'ouverture et la clôture d'une caisse par un caissier |
+| Agrégateur | Prestataire agréé qui centralise les paiements Mobile Money de plusieurs opérateurs |
+| RLS | Row-Level Security : règle de la base de données qui limite l'accès ligne par ligne |
+| Idempotence | Propriété d'une opération qui, rejouée, ne produit pas d'effet en double |
+| MRR | Revenu mensuel récurrent |
+
+## 22. Hypothèses et décisions ouvertes
+
+| Sujet | Options | Recommandation | Statut |
+|---|---|---|---|
+| Application Android | Native (Kotlin) ou multiplateforme (Flutter, React Native) | Multiplateforme si l'équipe est réduite ; native si une compétence Android solide existe. Valider par un prototype de la caisse hors ligne. | À décider |
+| Stack backend | TypeScript, Python ou autre, sur PostgreSQL | Choisir selon la compétence de l'équipe ; l'architecture visée est un monolithe modulaire. | À décider |
+| Synchronisation hors ligne | Solution du marché ou développement sur mesure | Mener une étude technique courte sur un cas simple (ventes et stock) avant de choisir. | À décider |
+| Mobile Money | Agrégateur unique ou intégrations directes | Commencer par un agrégateur agréé couvrant la RDC ; intégrations directes plus tard si le volume le justifie. | À décider |
+| Hébergement | Région cloud proche de la RDC ou en Europe | Retenir la région offrant la meilleure latence tout en respectant la section 20. | À décider |
+| Imprimante thermique | Bluetooth, USB ou impression via application tierce | Privilégier Bluetooth avec le protocole ESC/POS, testé sur les modèles courants du marché. | À décider |
+| Taux de change | Manuel ou source externe | Manuel et historisé pour le MVP. | Proposé |
+| Prix et plans | Voir section 16 | Valider par entretiens avec les pilotes. | À valider |
+| Périmètre du partage de revenus | Partenaires, parrainage, commission transactionnelle | Voir section 16.3. | À confirmer |
+
+## 23. Découpage prévu en issues GitHub
+
+| Épic | Jalon | Exigences principales |
+|---|---|---|
+| Architecture et socle technique | M0 | Section 8, KOM-NF-003, KOM-NF-021 |
+| Base de données multi-tenant | M0 | Section 7, KOM-006, KOM-NF-008 |
+| Authentification, rôles et permissions | M0 | KOM-001 à KOM-009, matrice section 19 |
+| Journal d'audit | M0 | KOM-027, KOM-NF-009 |
+| Catalogue produits et services | M1 | KOM-010, KOM-011, KOM-013 |
+| Caisse, reçus et session de caisse | M1 | KOM-020 à KOM-025, KOM-028 |
+| Multi-devises et taux de change | M1 | KOM-036 à KOM-039, section 18.1 |
+| Stock | M1 | KOM-040 à KOM-043, section 18.4 |
+| Clients et crédit | M1 | KOM-050 à KOM-053, section 18.3 |
+| Hors ligne et synchronisation | M1 | KOM-NF-004, KOM-NF-005, KOM-NF-015, KOM-NF-016, section 18.5 |
+| Rapports de base | M1 | KOM-060 à KOM-062, KOM-065 |
+| Paiements Mobile Money | M2 | KOM-031, KOM-034, KOM-035, section 18.6 |
+| Messagerie WhatsApp et SMS | M2 | KOM-024, KOM-054 |
+| Abonnement et facturation plateforme | M2 | KOM-070 à KOM-075 |
+| Back-office plateforme | M2 | KOM-080 à KOM-083 |
+| Tests de sécurité et d'isolation | M2 | KOM-NF-006 à KOM-NF-009, KOM-NF-018 |
+| Achats et fournisseurs, inventaire | M3 | KOM-044 à KOM-046 |
+| Factures, devis, retours | M3 | KOM-026, KOM-064 |
+| Multi-boutiques | M3 | KOM-003, KOM-063 |
+| Partenaires, parrainage et commissions | M3 | KOM-076 à KOM-078 |
+| Modules sectoriels et fidélité | M4 | Section 5, KOM-055 |
