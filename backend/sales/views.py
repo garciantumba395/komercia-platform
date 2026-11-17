@@ -6,7 +6,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.renderers import BaseRenderer, JSONRenderer
+from rest_framework.renderers import BaseRenderer
 from rest_framework.response import Response
 
 from core.permissions import ACCOUNTANT, CASHIER, MANAGER, OWNER, HasRole
@@ -121,8 +121,7 @@ class SaleViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
         return Response(SaleSerializer(self.get_queryset().get(pk=sale.pk)).data)
 
     @extend_schema(responses={200: str})
-    @action(detail=True, methods=["get"],
-            renderer_classes=[ReceiptHTMLRenderer, ReceiptTextRenderer, JSONRenderer])
+    @action(detail=True, methods=["get"])  # renderers fixés dans urls.py (as_view)
     def receipt(self, request, pk=None):
         sale = self.get_object()
         ctx = receipt.receipt_context(sale, request.tenant.name)

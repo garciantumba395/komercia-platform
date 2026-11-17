@@ -1,11 +1,16 @@
 from django.urls import path
 
-from .views import CashSessionViewSet, SaleViewSet
+from rest_framework.renderers import JSONRenderer
+
+from .views import CashSessionViewSet, ReceiptHTMLRenderer, ReceiptTextRenderer, SaleViewSet
 
 sales = SaleViewSet.as_view({"get": "list", "post": "create"})
 sale_detail = SaleViewSet.as_view({"get": "retrieve"})
 sale_cancel = SaleViewSet.as_view({"post": "cancel"})
-sale_receipt = SaleViewSet.as_view({"get": "receipt"})
+# `?format=html|text` : rendu direct (pas de négociation JSON) ; HTML par défaut.
+sale_receipt = SaleViewSet.as_view(
+    {"get": "receipt"}, renderer_classes=[ReceiptHTMLRenderer, ReceiptTextRenderer, JSONRenderer]
+)
 
 sessions = CashSessionViewSet.as_view({"get": "list"})
 session_open = CashSessionViewSet.as_view({"post": "open"})

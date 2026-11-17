@@ -12,6 +12,7 @@
   {% block body %}{% endblock %}
   <noscript><p class="noscript">Komersia a besoin de JavaScript pour fonctionner. Activez-le dans votre navigateur.</p></noscript>
   <script src="{% static 'web/app.js' %}"></script>
+  {% if page == 'pos' %}<script src="{% static 'web/pos.js' %}"></script>{% elif not public %}<script src="{% static 'web/pages.js' %}"></script>{% endif %}
   {% block scripts %}{% endblock %}
 </body>
 </html>

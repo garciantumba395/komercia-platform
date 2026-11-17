@@ -4,8 +4,11 @@ from decimal import Decimal
 
 from django.utils import timezone
 
-from accounts.models import Store
-from catalog.tests.helpers import client_for_role, make_product  # noqa: F401
+from rest_framework.authtoken.models import Token
+from rest_framework.test import APIClient
+
+from accounts.models import Membership, Store, User
+from catalog.tests.helpers import make_product  # noqa: F401
 from core.tenancy import tenant_context
 from currency.models import ExchangeRate
 from customers.models import Customer
@@ -48,3 +51,20 @@ def sale_body(handle, items, payments=None, **extra):
 
 def cash(amount, currency="CDF"):
     return {"method": "cash", "amount_minor": amount, "currency": currency}
+
+
+def client_for_role(handle, role, tag=""):
+    """Client authentifié d'un utilisateur de ce rôle ; le même (rôle, tag) renvoie le même utilisateur."""
+    if role == "owner":
+        return handle.client()
+    cache = handle.__dict__.setdefault("_role_clients", {})
+    key = (role, tag)
+    if key not in cache:
+        phone = f"+2439{uuid.uuid4().int % 10**9:09d}"
+        user = User.objects.create_user(phone=phone, password="MotDePasse-123!", full_name=role.title())
+        Membership.objects.create(user=user, tenant=handle.tenant, role=role)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=f"Token {Token.objects.create(user=user).key}")
+        client.user = user
+        cache[key] = client
+    return cache[key]
