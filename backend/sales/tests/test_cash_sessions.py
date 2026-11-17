@@ -63,7 +63,7 @@ def test_open_validation(tenant_a):
 def test_reopen_after_close(tenant_a):
     cashier = client_for_role(tenant_a, "cashier")
     sid = open_session(cashier, tenant_a).data["id"]
-    assert cashier.post(f"{SESSIONS}{sid}/close/", {"counted": {"CDF": 0, "USD": 0}}, format="json").status_code == 200
+    assert cashier.post(f"{SESSIONS}{sid}/close/", {"counted": {"CDF": 0, "USD": 0}}, format="json").status_code == 200  # noqa: E501
     assert open_session(cashier, tenant_a).status_code == 201
 
 
@@ -73,7 +73,7 @@ def test_cashier_cannot_sell_without_open_session(tenant_a):
     r = cashier.post(BASE, sale_body(tenant_a, [(p, 1)], [cash(1000)]), format="json")
     assert r.status_code == 400 and r.data["detail"] == "Ouvrez la caisse avant de vendre."
     # propriétaire et gérant vendent sans session
-    assert tenant_a.client().post(BASE, sale_body(tenant_a, [(p, 1)], [cash(1000)]), format="json").status_code == 201
+    assert tenant_a.client().post(BASE, sale_body(tenant_a, [(p, 1)], [cash(1000)]), format="json").status_code == 201  # noqa: E501
     manager = client_for_role(tenant_a, "manager")
     assert manager.post(BASE, sale_body(tenant_a, [(p, 1)], [cash(1000)]), format="json").status_code == 201
 
@@ -116,7 +116,7 @@ def test_close_expected_counted_difference_per_currency(tenant_a):
     sell(sale_body(tenant_a, [(usd_prod, 1)], [cash(200, "USD")], currency="USD"))
     # S3 : annulée, exclue
     s3 = sell(sale_body(tenant_a, [(cdf_prod, 1)], [cash(3000)]))
-    assert tenant_a.client().post(f"{BASE}{s3['id']}/cancel/", {"reason": "Erreur"}, format="json").status_code == 200
+    assert tenant_a.client().post(f"{BASE}{s3['id']}/cancel/", {"reason": "Erreur"}, format="json").status_code == 200  # noqa: E501
     # S4 : crédit, 500 CDF encaissés seulement
     sell(sale_body(tenant_a, [(cdf_prod, 1)], [cash(500)], customer=str(cust.id), credit_remaining=True))
 
@@ -174,7 +174,7 @@ def test_close_permissions(tenant_a):
     assert other.post(f"{SESSIONS}{other_user_session}/close/", body, format="json").status_code == 404
     # propriétaire/gérant clôturent n'importe quelle session
     assert client_for_role(tenant_a, "manager").post(url, body, format="json").status_code == 200
-    assert tenant_a.client().post(f"{SESSIONS}{other_user_session}/close/", body, format="json").status_code == 200
+    assert tenant_a.client().post(f"{SESSIONS}{other_user_session}/close/", body, format="json").status_code == 200  # noqa: E501
     with tenant_context(tenant_a.tenant.id):
         assert CashSession.objects.get(pk=sid).closed_by.full_name == "Manager"
 
@@ -197,5 +197,5 @@ def test_session_isolation(tenant_a, tenant_b):
     a = tenant_a.client()
     assert a.get(SESSIONS).data["count"] == 0
     assert a.get(SESSIONS + "current/").status_code == 404
-    assert a.post(f"{SESSIONS}{sid}/close/", {"counted": {"CDF": 0, "USD": 0}}, format="json").status_code == 404
+    assert a.post(f"{SESSIONS}{sid}/close/", {"counted": {"CDF": 0, "USD": 0}}, format="json").status_code == 404  # noqa: E501
     assert open_session(a, tenant_a, store=tenant_b.store.id).status_code == 400

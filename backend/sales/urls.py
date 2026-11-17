@@ -1,5 +1,4 @@
 from django.urls import path
-
 from rest_framework.renderers import JSONRenderer
 
 from .views import CashSessionViewSet, ReceiptHTMLRenderer, ReceiptTextRenderer, SaleViewSet

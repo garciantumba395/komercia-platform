@@ -259,6 +259,7 @@ class Command(BaseCommand):
             else:  # espèces, avec un billet rond
                 rounded = -(-total_cdf // 1000) * 1000
                 body["payments"] = [{"method": "cash", "amount_minor": rounded, "currency": "CDF"}]
+            body["payments"] = [pay for pay in body["payments"] if pay["amount_minor"] > 0]
             response = client.post("/api/v1/sales/", body, format="json")
             if response.status_code in (200, 201):
                 done += 1

@@ -278,7 +278,7 @@ def test_cashier_cannot_override_credit_limit(tenant_a):
     cust = make_customer(tenant_a, limit=3000)
     p = make_product(tenant_a, price_minor=6000, track_stock=False)
     cashier = client_for_role(tenant_a, "cashier")
-    assert cashier.post(SESSIONS + "open/", {"store": str(tenant_a.store.id)}, format="json").status_code == 201
+    assert cashier.post(SESSIONS + "open/", {"store": str(tenant_a.store.id)}, format="json").status_code == 201  # noqa: E501
     r = post(cashier, sale_body(tenant_a, [(p, 1)], customer=str(cust.id), credit_remaining=True,
                                 override_credit_limit=True))
     assert r.status_code == 400
@@ -473,7 +473,7 @@ def test_cashier_discount_cap_configurable(tenant_a, settings):
 def test_owner_and_manager_have_no_discount_cap(tenant_a):
     p = make_product(tenant_a, price_minor=1000, track_stock=False)
     manager = client_for_role(tenant_a, "manager")
-    assert post(tenant_a.client(), sale_body(tenant_a, [(p, 10)], [cash(2000)], discount_minor=8000)).status_code == 201
+    assert post(tenant_a.client(), sale_body(tenant_a, [(p, 10)], [cash(2000)], discount_minor=8000)).status_code == 201  # noqa: E501
     assert post(manager, sale_body(tenant_a, [(p, 10)], [cash(2000)], discount_minor=8000)).status_code == 201
 
 
