@@ -61,3 +61,14 @@ def test_owner_manages_users_and_cashier_is_restricted(tenant_a):
     assert api.patch(f"/api/v1/users/{uid}/", {"is_active": False}, format="json").status_code == 200
     assert cashier.get("/api/v1/stores/").status_code == 401 or \
         cashier.get("/api/v1/stores/").status_code == 403
+
+
+def test_login_of_deactivated_user_gives_explicit_message(tenant_a):
+    from accounts.models import Membership
+
+    Membership.objects.filter(user=tenant_a.user).update(is_active=False)
+    res = APIClient().post("/api/v1/auth/login/",
+                           {"phone": tenant_a.user.phone, "password": "MotDePasse-123!"})
+    assert res.status_code == 403
+    assert res.data["code"] == "account_disabled"
+    assert "désactivé" in res.data["detail"]

@@ -66,17 +66,26 @@ class SaleSerializer(serializers.ModelSerializer):
     items = SaleItemSerializer(many=True, read_only=True)
     payments = PaymentSerializer(many=True, read_only=True)
     rate_cdf_per_usd = serializers.SerializerMethodField()
+    customer_name = serializers.SerializerMethodField()
+    cashier_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Sale
         fields = [
-            "id", "number", "client_id", "status", "store", "currency", "customer", "cashier",
+            "id", "number", "client_id", "status", "store", "currency", "customer", "customer_name",
+            "cashier", "cashier_name",
             "items", "subtotal_minor", "discount_minor", "tax_minor", "total_minor",
             "rate_cdf_per_usd", "rate_id", "payments", "paid_minor", "change_minor", "change_currency",
             "credit_minor", "cash_session", "device_time", "created_at",
             "cancelled_at", "cancelled_by", "cancel_reason",
         ]
         read_only_fields = fields
+
+    def get_customer_name(self, obj) -> str | None:
+        return obj.customer.name if obj.customer_id else None
+
+    def get_cashier_name(self, obj) -> str | None:
+        return obj.cashier.full_name if obj.cashier_id else None
 
     def get_rate_cdf_per_usd(self, obj) -> str | None:
         return None if obj.rate_cdf_per_usd is None else f"{obj.rate_cdf_per_usd:.4f}"

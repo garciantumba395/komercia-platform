@@ -704,3 +704,17 @@ def test_sale_is_immutable(tenant_a):
             item.save()
         with pytest.raises(RuntimeError):
             sale.payments.get().delete()
+
+
+def test_sale_exposes_customer_and_cashier_names(tenant_a):
+    make_rate(tenant_a)
+    p = make_product(tenant_a, price_minor=1500)
+    give_stock(tenant_a, p, 10)
+    customer = make_customer(tenant_a, name="Papa Joseph")
+    body = sale_body(tenant_a, [(p, 1)], [cash(1500)], customer=str(customer.id))
+    r = post(tenant_a.client(), body)
+    assert r.status_code == 201, r.data
+    assert r.data["customer_name"] == "Papa Joseph"
+    assert r.data["cashier_name"] == tenant_a.user.full_name
+    anonymous = post(tenant_a.client(), sale_body(tenant_a, [(p, 1)], [cash(1500)]))
+    assert anonymous.data["customer_name"] is None

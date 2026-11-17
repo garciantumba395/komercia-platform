@@ -49,7 +49,13 @@ class LoginView(APIView):
         user = serializer.validated_data["user"]
         membership = user.memberships.filter(is_active=True).order_by("created_at").first()
         if membership is None:
-            return Response({"detail": "Aucune entreprise active."}, status=403)
+            has_membership = user.memberships.exists()
+            return Response(
+                {"detail": "Compte désactivé. Contactez le propriétaire de l'entreprise."
+                 if has_membership else "Aucune entreprise active.",
+                 "code": "account_disabled" if has_membership else "no_active_tenant"},
+                status=403,
+            )
         return Response(
             {"token": issue_token(user), "role": membership.role,
              "tenant": {"id": str(membership.tenant_id), "name": membership.tenant.name,
