@@ -1,3 +1,4 @@
+import zlib
 from datetime import date, timedelta
 
 import pytest
@@ -225,7 +226,7 @@ def test_isolation_between_tenants(tenant_a, tenant_b):
     ("accountant", 200, 403), ("storekeeper", 403, 403),
 ])
 def test_role_matrix(tenant_a, role, read, write):
-    api = client_with_role(tenant_a, role, f"+2439{abs(hash(role)) % 10**8:08d}")
+    api = client_with_role(tenant_a, role, f"+2439{zlib.crc32(role.encode()) % 10**8:08d}")
     assert api.get(f"{BASE}/customers/").status_code == read
     assert api.get(f"{BASE}/debts/").status_code == read
     assert api.post(f"{BASE}/customers/", {"name": "N"}, format="json").status_code == write

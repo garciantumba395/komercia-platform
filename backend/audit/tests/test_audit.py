@@ -1,6 +1,7 @@
 import datetime
 import decimal
 import uuid
+import zlib
 
 import pytest
 from django.db import IntegrityError, ProgrammingError, connection, transaction
@@ -144,7 +145,7 @@ def test_cannot_write_for_other_tenant_at_db_level(tenant_a, tenant_b):
 ])
 def test_permissions_by_role(tenant_a, client_for_role, role, allowed):
     entry = make_entry(tenant_a)
-    api = client_for_role(tenant_a, role, f"+24399{abs(hash(role)) % 10**7:07d}")
+    api = client_for_role(tenant_a, role, f"+24399{zlib.crc32(role.encode()) % 10**7:07d}")
     expected = 200 if allowed else 403
     assert api.get(URL).status_code == expected
     assert api.get(f"{URL}{entry.pk}/").status_code == expected

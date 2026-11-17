@@ -1,3 +1,5 @@
+import zlib
+
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
@@ -11,7 +13,7 @@ def client_for_role(handle, role: str) -> APIClient:
     """Crée un utilisateur de ce rôle dans le tenant et renvoie un client authentifié."""
     if role == "owner":
         return handle.client()
-    phone = f"+24398{abs(hash((str(handle.tenant.id), role))) % 10**7:07d}"
+    phone = f"+24398{zlib.crc32(f"{handle.tenant.id}{role}".encode()) % 10**7:07d}"
     user = User.objects.create_user(phone=phone, password=PASSWORD, full_name=role.title())
     Membership.objects.create(user=user, tenant=handle.tenant, role=role)
     token, _ = Token.objects.get_or_create(user=user)
