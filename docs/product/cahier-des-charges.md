@@ -164,19 +164,19 @@ Le MVP doit permettre à un commerçant de démarrer et gérer son activité de 
 
 ### 4.8 Abonnement et facturation de la plateforme
 
-Voir le modèle économique en section 16.
+Voir le modèle économique en section 16. L'abonnement est la seule source de revenus de Komersia.
 
 | ID | Exigence | Priorité |
 |---|---|---|
 | KOM-070 | Le système doit gérer des plans d'abonnement configurables, avec des limites par plan (boutiques, utilisateurs, modules, volume de messages). | P1 |
-| KOM-071 | Un nouveau commerçant doit bénéficier d'un essai gratuit sans moyen de paiement enregistré. | P1 |
-| KOM-072 | Le commerçant doit pouvoir payer son abonnement par Mobile Money, et recevoir un reçu d'abonnement. | P1 |
-| KOM-073 | Le système doit envoyer des rappels avant l'échéance et appliquer une période de grâce. | P1 |
-| KOM-074 | En cas d'impayé, le système doit se dégrader progressivement (limitation de fonctions) sans jamais bloquer l'enregistrement d'une vente ni l'export des données du commerçant. | P1 |
-| KOM-075 | Le commerçant doit pouvoir changer de plan, avec calcul au prorata. | P1 |
-| KOM-076 | Le système doit gérer des codes de parrainage et attribuer chaque commerçant à un partenaire ou à un parrain. | P2 |
-| KOM-077 | Le système doit calculer les commissions des partenaires, produire un relevé mensuel et suivre leur paiement. | P2 |
-| KOM-078 | Le système doit enregistrer, pour chaque paiement Mobile Money collecté, les frais de l'opérateur ou de l'agrégateur et la commission Komersia. | P2 |
+| KOM-071 | Un nouveau commerçant doit pouvoir démarrer avec le plan gratuit ou avec un essai gratuit d'un plan payant, sans moyen de paiement enregistré. | P1 |
+| KOM-072 | **Première souscription :** le commerçant doit pouvoir choisir un plan, payer par Mobile Money, et voir son abonnement activé dès la confirmation du paiement, avec un reçu. | P1 |
+| KOM-073 | **Paiement mensuel :** le système doit calculer l'échéance, envoyer des rappels avant la date (7 jours, 3 jours et le jour même), permettre au commerçant de payer en quelques actions par Mobile Money, et prolonger l'abonnement d'un mois à la confirmation. | P1 |
+| KOM-074 | En cas d'impayé, le système doit appliquer une période de grâce puis une limitation progressive des fonctions, sans jamais bloquer l'enregistrement d'une vente ni l'export des données du commerçant. | P1 |
+| KOM-075 | Le commerçant doit pouvoir passer à un plan supérieur (effet immédiat, au prorata) ou inférieur (effet à la fin de la période payée). | P1 |
+| KOM-076 | Le commerçant doit pouvoir résilier son abonnement : il reste actif jusqu'à la fin de la période payée, puis passe au plan gratuit, et ses données restent exportables. | P1 |
+| KOM-077 | Le commerçant doit pouvoir consulter l'historique de ses paiements d'abonnement et télécharger ses reçus ou factures. | P1 |
+| KOM-078 | L'état de l'abonnement (essai, actif, en retard, limité, résilié), la date d'échéance et les limites du plan doivent être visibles en permanence pour le propriétaire. | P1 |
 
 ### 4.9 Back-office de la plateforme
 
@@ -373,7 +373,8 @@ Le MVP est considéré comme livré lorsque les conditions suivantes sont rempli
 | Manipulation de l'heure de l'appareil hors ligne | Données incohérentes | Horodatage appareil et serveur, détection d'écart, plafond de durée hors ligne |
 | Exigences réglementaires (paiement, fiscalité, données) | Blocage ou sanction | Agrégateur agréé, validation juridique locale avant lancement (section 20) |
 | Prix trop élevé pour la clientèle cible | Faible conversion payante | Offre gratuite, tarifs testés avec les pilotes, paiement mensuel en petites sommes (section 16) |
-| Marge insuffisante sur Mobile Money | Modèle non rentable | Calculer la marge après frais de l'agrégateur avant de fixer la commission |
+| Paiements mensuels oubliés ou manqués (paiement non automatique) | Churn involontaire, revenu irrégulier | Rappels multiples, paiement en quelques actions, période de grâce, relance par WhatsApp |
+| Dépendance d'un seul revenu (l'abonnement) | Revenu fragile si l'adoption est lente | Suivre MRR et conversion dès le pilote, maîtriser les coûts, revoir le modèle si les objectifs ne sont pas atteints |
 | Dépendance à un fournisseur de messagerie (WhatsApp/SMS) | Coûts et interruptions | Plafonds par plan, fournisseurs alternatifs, repli par SMS |
 
 ## 15. Indicateurs de succès
@@ -389,8 +390,8 @@ Le MVP est considéré comme livré lorsque les conditions suivantes sont rempli
 - Revenu mensuel récurrent (MRR) et revenu moyen par commerçant (ARPU).
 - Taux de conversion de l'offre gratuite vers une offre payante.
 - Taux de désabonnement (churn) mensuel.
-- Coût d'acquisition par commerçant, y compris les commissions de partenaires, rapporté à la valeur vie client (LTV).
-- Marge nette sur les paiements Mobile Money, après frais de l'agrégateur.
+- Taux de renouvellement mensuel à l'échéance et taux de paiements d'abonnement réussis.
+- Coût d'acquisition par commerçant rapporté à la valeur vie client (LTV).
 - Part des commerçants actifs 7 jours après l'inscription (activation).
 
 Les cibles chiffrées seront fixées après la phase pilote.
@@ -399,13 +400,14 @@ Les cibles chiffrées seront fixées après la phase pilote.
 
 ### 16.1 Principes
 
-- Trois sources de revenus : **abonnement**, **commission sur les paiements Mobile Money**, **services complémentaires**.
-- Un **partage de revenus** avec les partenaires qui apportent et accompagnent des commerçants (revendeurs, agents terrain, parrains).
+- **L'abonnement est la seule source de revenus de Komersia.** Il n'y a ni commission sur les ventes ou les paiements des commerçants, ni programme de partage de revenus avec des partenaires.
+- Le parcours est simple : **achat d'un plan, première souscription, puis paiement mensuel**.
 - Prix affichés en USD, payables en CDF ou en USD par Mobile Money.
-- Une offre gratuite pour favoriser l'adoption, et un essai gratuit des offres payantes.
-- Ne jamais retenir les données du commerçant en otage : l'export reste toujours possible et la caisse reste utilisable (KOM-074).
+- Une offre gratuite et un essai gratuit favorisent l'adoption.
+- Les commerçants ne sont jamais pénalisés au point de perdre leurs données : l'export reste toujours possible et la caisse reste utilisable (KOM-074).
+- Les paiements Mobile Money que les commerçants reçoivent de leurs clients ne génèrent aucun revenu pour Komersia. Les frais éventuels de l'opérateur ou de l'agrégateur sont à la charge de celui qui les supporte selon les conditions de l'opérateur, et ne sont pas prélevés par Komersia.
 
-### 16.2 Abonnement
+### 16.2 Plans d'abonnement
 
 | Plan | Cible | Contenu indicatif | Prix mensuel *(hypothèse)* |
 |---|---|---|---|
@@ -414,29 +416,28 @@ Les cibles chiffrées seront fixées après la phase pilote.
 | Pro | Commerce établi | Jusqu'à 3 boutiques, 10 utilisateurs, achats et fournisseurs, factures et devis, exports, rapports avancés | 15 USD |
 | Business | Multi-boutiques, grossiste | Plus de boutiques et d'utilisateurs, modules sectoriels, accès API, support prioritaire | 40 USD, plus un supplément par boutique |
 
-Modalités :
-- Essai gratuit de 14 jours des plans payants, sans carte ni compte de paiement.
-- Paiement mensuel ou annuel (avec deux mois offerts *(hypothèse)*). Le Mobile Money se prête mal au prélèvement automatique : le système envoie un rappel et le commerçant valide le paiement.
-- Période de grâce de 7 jours *(hypothèse)*, puis limitation progressive des fonctions (KOM-073, KOM-074).
-- Le contenu exact des plans, les limites et les prix sont à valider par des entretiens avec les commerçants pilotes (consentement à payer, capacité de paiement).
+Le contenu exact des plans, les limites et les prix sont à valider par des entretiens avec les commerçants pilotes (consentement à payer, capacité de paiement). La facturation est mensuelle uniquement ; un paiement annuel pourra être étudié plus tard.
 
-### 16.3 Partage de revenus et commissions
+### 16.3 Cycle de vie de l'abonnement
 
-| Mécanisme | Principe | Valeur indicative *(hypothèse)* |
+1. **Inscription.** Le commerçant démarre avec le plan Gratuit ou un essai de 14 jours *(hypothèse)* d'un plan payant, sans moyen de paiement (KOM-071).
+2. **Achat et première souscription.** Il choisit un plan, paie par Mobile Money et l'abonnement s'active dès la confirmation du paiement. Il reçoit un reçu (KOM-072). La date d'échéance est fixée à un mois après l'activation.
+3. **Paiement mensuel.** Le système rappelle l'échéance à 7 jours, 3 jours et le jour même. Le commerçant paie par Mobile Money, ce qui prolonge l'abonnement d'un mois à compter de l'échéance (KOM-073). Le Mobile Money se prête mal au prélèvement automatique : le paiement reste déclenché par le commerçant.
+4. **Retard de paiement.** Période de grâce de 7 jours *(hypothèse)*, puis limitation progressive des fonctions payantes. La caisse et l'export des données restent disponibles (KOM-074).
+5. **Changement de plan.** Passage au plan supérieur immédiat, au prorata ; passage au plan inférieur à la fin de la période payée (KOM-075).
+6. **Résiliation.** L'abonnement reste actif jusqu'à la fin de la période payée, puis le compte passe au plan gratuit (KOM-076).
+
+| État | Description | Accès |
 |---|---|---|
-| Commission sur paiements Mobile Money | Pourcentage sur les paiements collectés via Komersia, après frais de l'agrégateur | 0,5 à 1,5 % du montant, à fixer après calcul de la marge réelle |
-| Programme partenaires (revendeurs, agents terrain) | Commission récurrente sur les abonnements des commerçants apportés, suivie par code de parrainage | 20 à 30 % de l'abonnement pendant 12 mois |
-| Parrainage entre commerçants | Récompense pour le parrain et le filleul | 1 mois offert pour chacun |
-| Services complémentaires | Packs de messages WhatsApp/SMS, installation, formation, matériel (imprimante) | Selon catalogue |
-
-Règles :
-- Chaque commerçant est rattaché à au plus un partenaire ou parrain, de façon traçable (KOM-076).
-- Les commissions sont calculées automatiquement, visibles dans un relevé mensuel et payées après validation (KOM-077).
-- Komersia ne conserve pas les fonds des commerçants : les encaissements transitent par un agrégateur de paiement agréé (voir section 20).
+| Essai | Période d'essai gratuite d'un plan payant | Toutes les fonctions du plan essayé |
+| Actif | Abonnement payé et à jour | Toutes les fonctions du plan |
+| En retard | Échéance dépassée, période de grâce en cours | Toutes les fonctions, avec rappels |
+| Limité | Grâce terminée sans paiement | Fonctions payantes limitées ; caisse et export disponibles |
+| Résilié | Résiliation effective | Plan gratuit |
 
 ### 16.4 Indicateurs économiques
 
-MRR, ARPU, conversion gratuit vers payant, churn, coût d'acquisition (commissions incluses), LTV/CAC, marge sur transaction (voir section 15).
+MRR, ARPU, conversion du plan gratuit ou de l'essai vers un plan payant, taux de renouvellement à l'échéance, taux de paiements d'abonnement réussis, churn, coût d'acquisition et LTV/CAC (voir section 15).
 
 ## 17. Jalons et feuille de route
 
@@ -445,7 +446,7 @@ MRR, ARPU, conversion gratuit vers payant, churn, coût d'acquisition (commissio
 | M0 — Fondations | Poser le socle technique | Architecture, CI/CD, environnements, base multi-tenant avec RLS, authentification, rôles, audit |
 | M1 — Caisse hors ligne | Premier produit utilisable par les pilotes | Catalogue, caisse en espèces, multi-devises, stock, clients et crédit, clôture de caisse, rapports de base, synchronisation hors ligne, reçus imprimables |
 | M2 — Paiements et monétisation | MVP commercialisable | Mobile Money via un agrégateur, reçus WhatsApp/SMS, abonnement et essai, back-office, tests de sécurité complets, notifications |
-| M3 — Croissance | Étendre l'offre | Achats et fournisseurs, factures et devis, multi-boutiques, inventaire, programme partenaires et parrainage, commissions |
+| M3 — Croissance | Étendre l'offre | Achats et fournisseurs, factures et devis, multi-boutiques, inventaire |
 | M4 — Modules | Spécialiser par secteur | Modules sectoriels, fidélité, export comptable |
 
 Le MVP commercialisable correspond à M0 + M1 + M2. La phase pilote démarre dès la fin de M1 afin de valider l'ergonomie et le hors ligne avant d'investir dans les paiements.
@@ -514,11 +515,11 @@ Les points suivants sont à valider avec un conseil juridique local avant le lan
 
 | Domaine | Point d'attention |
 |---|---|
-| Paiements | Le traitement des fonds relève d'acteurs agréés par la Banque centrale du Congo. Komersia doit passer par un agrégateur ou un opérateur agréé, et ne pas détenir les fonds des commerçants. |
+| Paiements | Le traitement des fonds relève d'acteurs agréés par la Banque centrale du Congo. Komersia doit passer par un agrégateur ou un opérateur agréé, y compris pour encaisser les abonnements, et ne pas détenir les fonds des commerçants. |
 | Fiscalité | Reçus, factures et TVA doivent respecter les règles de l'administration fiscale congolaise (taux de TVA en vigueur à vérifier). L'intégration fiscale automatisée est hors périmètre du MVP. |
 | Données personnelles | Respecter le cadre congolais applicable (notamment le Code du numérique de 2023, à vérifier) : information et consentement, droit d'accès et de suppression, durée de conservation, localisation de l'hébergement. |
 | Messagerie | Obtenir le consentement des clients avant les messages WhatsApp ou SMS, et permettre de s'y opposer. |
-| Contrats | Rédiger les conditions générales d'utilisation, la politique de confidentialité et les conditions du programme partenaires. |
+| Contrats | Rédiger les conditions générales d'utilisation, la politique de confidentialité et les conditions de vente de l'abonnement (renouvellement, retard, résiliation, remboursement). |
 | Conservation | Définir la durée de conservation des ventes, paiements et journaux d'audit. |
 
 ## 21. Glossaire
@@ -544,8 +545,8 @@ Les points suivants sont à valider avec un conseil juridique local avant le lan
 | Hébergement | Région cloud proche de la RDC ou en Europe | Retenir la région offrant la meilleure latence tout en respectant la section 20. | À décider |
 | Imprimante thermique | Bluetooth, USB ou impression via application tierce | Privilégier Bluetooth avec le protocole ESC/POS, testé sur les modèles courants du marché. | À décider |
 | Taux de change | Manuel ou source externe | Manuel et historisé pour le MVP. | Proposé |
-| Prix et plans | Voir section 16 | Valider par entretiens avec les pilotes. | À valider |
-| Périmètre du partage de revenus | Partenaires, parrainage, commission transactionnelle | Voir section 16.3. | À confirmer |
+| Prix et plans | Voir section 16.2 | Valider par entretiens avec les pilotes. | À valider |
+| Modèle économique | Abonnement uniquement | Abonnement mensuel, sans commission ni partage de revenus. | Décidé |
 
 ## 23. Découpage prévu en issues GitHub
 
@@ -564,11 +565,10 @@ Les points suivants sont à valider avec un conseil juridique local avant le lan
 | Rapports de base | M1 | KOM-060 à KOM-062, KOM-065 |
 | Paiements Mobile Money | M2 | KOM-031, KOM-034, KOM-035, section 18.6 |
 | Messagerie WhatsApp et SMS | M2 | KOM-024, KOM-054 |
-| Abonnement et facturation plateforme | M2 | KOM-070 à KOM-075 |
+| Abonnement : achat, première souscription et paiement mensuel | M2 | KOM-070 à KOM-078 |
 | Back-office plateforme | M2 | KOM-080 à KOM-083 |
 | Tests de sécurité et d'isolation | M2 | KOM-NF-006 à KOM-NF-009, KOM-NF-018 |
 | Achats et fournisseurs, inventaire | M3 | KOM-044 à KOM-046 |
 | Factures, devis, retours | M3 | KOM-026, KOM-064 |
 | Multi-boutiques | M3 | KOM-003, KOM-063 |
-| Partenaires, parrainage et commissions | M3 | KOM-076 à KOM-078 |
 | Modules sectoriels et fidélité | M4 | Section 5, KOM-055 |
