@@ -115,6 +115,7 @@ class Sale(TenantOwnedModel):
         indexes = [
             models.Index(fields=["tenant", "store", "-created_at"], name="sale_store_date_idx"),
             models.Index(fields=["tenant", "cashier", "-created_at"], name="sale_cashier_date_idx"),
+            models.Index(fields=["tenant", "status", "created_at"], name="sale_status_date_idx"),
         ]
 
     def __str__(self):
