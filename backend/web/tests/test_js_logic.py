@@ -13,15 +13,22 @@ pytestmark = pytest.mark.skipif(NODE is None, reason="Node.js indisponible")
 
 HARNESS = """
 const vm = require('vm'), fs = require('fs');
-const win = { localStorage: {}, location: { search: '', replace() {} }, matchMedia: () => ({ matches: false }) };
-const doc = { addEventListener() {}, body: { dataset: {} }, getElementById: () => null, createElement: () => ({ appendChild() {}, setAttribute() {}, addEventListener() {} }), createTextNode: (t) => t };
-const ctx = vm.createContext({ window: win, document: doc, URLSearchParams, Intl, BigInt, console, setTimeout, clearTimeout });
-vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), ctx);
-const K = win.Komersia;
-const out = JSON.parse(process.argv[3]).map(([fn, args]) => {
-  const target = fn.split('.').reduce((o, k) => o[k], K);
-  return target(...args);
+const noop = () => {};
+const win = {
+  localStorage: {}, location: { search: '', replace: noop }, matchMedia: () => ({ matches: false }),
+};
+const doc = {
+  addEventListener: noop, body: { dataset: {} }, getElementById: () => null,
+  createElement: () => ({ appendChild: noop, setAttribute: noop, addEventListener: noop }),
+  createTextNode: (t) => t,
+};
+const ctx = vm.createContext({
+  window: win, document: doc, URLSearchParams, Intl, BigInt, console, setTimeout, clearTimeout,
 });
+vm.runInContext(fs.readFileSync(process.argv[1], 'utf8'), ctx);
+const K = win.Komersia;
+const arg = (a) => (typeof a === 'string' && a.startsWith('rate:') ? K.rateScaled(a.slice(5)) : a);
+const out = JSON.parse(process.argv[2]).map(([fn, args]) => fn.split('.').reduce((o, k) => o[k], K)(...args.map(arg)));
 console.log(JSON.stringify(out));
 """
 
@@ -52,15 +59,20 @@ def test_amount_formatting_and_parsing():
 
 def test_mixed_payment_rounds_once_in_sale_currency():
     # 2850 FC/$ : 1000 FC + 1,00 $ = 1,35 $ (rounded once) ; en francs 3 850 FC
-    rate = run([["rateScaled", ["2850.0000"]]])[0]
-    assert rate == 28500000
-    got = run([["paidInCurrency", [1000, 100, "USD", 28500000]], ["paidInCurrency", [1000, 100, "CDF", 28500000]],
-               ["convert", [3500, "CDF", "USD", 28500000]], ["convert", [123, "USD", "CDF", 28500000]]])
+    rs = "rate:2850.0000"
+    got = run([
+        ["paidInCurrency", [1000, 100, "USD", rs]], ["paidInCurrency", [1000, 100, "CDF", rs]],
+        ["convert", [3500, "CDF", "USD", rs]], ["convert", [123, "USD", "CDF", rs]],
+    ])
     assert got == [135, 3850, 123, 3506]
 
 
 def test_phone_normalisation_and_role_rules():
-    got = run([["normalizePhone", ["0990 000 001"]], ["normalizePhone", ["243990000001"]], ["normalizePhone", ["+243990000001"]],
-               ["canWrite.cancel", ["owner"]], ["canWrite.cancel", ["cashier"]], ["canWrite.cancel", ["storekeeper"]],
-               ["canWrite.products", ["manager"]], ["canWrite.products", ["storekeeper"]], ["canWrite.stock", ["storekeeper"]]])
+    got = run([
+        ["normalizePhone", ["0990 000 001"]], ["normalizePhone", ["243990000001"]],
+        ["normalizePhone", ["+243990000001"]],
+        ["canWrite.cancel", ["owner"]], ["canWrite.cancel", ["cashier"]], ["canWrite.cancel", ["storekeeper"]],
+        ["canWrite.products", ["manager"]], ["canWrite.products", ["storekeeper"]],
+        ["canWrite.stock", ["storekeeper"]],
+    ])
     assert got == ["+243990000001"] * 3 + [True, False, False, True, False, True]
