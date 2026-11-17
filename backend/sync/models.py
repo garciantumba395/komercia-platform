@@ -41,7 +41,8 @@ class SyncOperation(TenantOwnedModel):
     entity_version = models.DateTimeField(null=True, blank=True)
     payload = models.JSONField(default=dict)
     result = models.JSONField(default=dict)
-    device_time = models.DateTimeField()  # heure de l'appareil : conservée, jamais utilisée comme heure métier
+    # Heure de l'appareil : conservée, jamais utilisée comme heure métier.
+    device_time = models.DateTimeField()
     received_at = models.DateTimeField(default=timezone.now)  # heure du serveur
 
     objects = SyncOperationQuerySet.as_manager()

@@ -23,13 +23,19 @@ MAX_OPERATIONS_PER_BATCH = 200
 
 
 class OperationSerializer(serializers.Serializer):
-    op_id = serializers.UUIDField(help_text="Identifiant de l'opération, généré sur l'appareil (clé d'idempotence).")
-    type = serializers.CharField(max_length=30, help_text="Un des types : " + ", ".join(OPERATION_TYPES) + ".")
+    op_id = serializers.UUIDField(
+        help_text="Identifiant de l'opération, généré sur l'appareil (clé d'idempotence)."
+    )
+    type = serializers.CharField(
+        max_length=30, help_text="Un des types : " + ", ".join(OPERATION_TYPES) + "."
+    )
     device_time = serializers.DateTimeField(
         help_text="Heure de l'appareil à la création de l'opération (ISO 8601). Conservée, jamais utilisée "
         "comme heure de la vente."
     )
-    payload = serializers.DictField(help_text="Contenu de l'opération (voir la documentation de chaque type).")
+    payload = serializers.DictField(
+        help_text="Contenu de l'opération (voir la documentation de chaque type)."
+    )
 
 
 class PushRequestSerializer(serializers.Serializer):
@@ -52,7 +58,9 @@ class OperationWarningSerializer(serializers.Serializer):
 class OperationResultSerializer(serializers.Serializer):
     op_id = serializers.UUIDField()
     status = serializers.ChoiceField(choices=["applied", "duplicate", "rejected"])
-    entity_id = serializers.UUIDField(required=False, help_text="Identifiant serveur de l'entité (vente, client...).")
+    entity_id = serializers.UUIDField(
+        required=False, help_text="Identifiant serveur de l'entité (vente, client...)."
+    )
     data = serializers.JSONField(required=False, help_text="Données utiles (numéro de vente...).")
     error = OperationErrorSerializer(required=False)
     warnings = OperationWarningSerializer(many=True, required=False)
