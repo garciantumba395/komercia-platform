@@ -169,14 +169,15 @@ Voir le modèle économique en section 16. L'abonnement est la seule source de r
 | ID | Exigence | Priorité |
 |---|---|---|
 | KOM-070 | Le système doit gérer des plans d'abonnement configurables, avec des limites par plan (boutiques, utilisateurs, modules, volume de messages). | P1 |
-| KOM-071 | Un nouveau commerçant doit pouvoir démarrer avec le plan gratuit ou avec un essai gratuit d'un plan payant, sans moyen de paiement enregistré. | P1 |
+| KOM-071 | Un nouveau commerçant doit bénéficier d'un **essai gratuit de 14 jours**, sans moyen de paiement enregistré, avec accès aux fonctions du plan Pro *(hypothèse)*. Il n'existe pas de plan gratuit permanent. Le système doit rappeler la fin de l'essai (à 7 jours, 3 jours, 1 jour et le dernier jour) et proposer la souscription depuis ces rappels. | P1 |
 | KOM-072 | **Première souscription :** le commerçant doit pouvoir choisir un plan, payer par Mobile Money, et voir son abonnement activé dès la confirmation du paiement, avec un reçu. | P1 |
 | KOM-073 | **Paiement mensuel :** le système doit calculer l'échéance, envoyer des rappels avant la date (7 jours, 3 jours et le jour même), permettre au commerçant de payer en quelques actions par Mobile Money, et prolonger l'abonnement d'un mois à la confirmation. | P1 |
-| KOM-074 | En cas d'impayé, le système doit appliquer une période de grâce puis une limitation progressive des fonctions, sans jamais bloquer l'enregistrement d'une vente ni l'export des données du commerçant. | P1 |
+| KOM-074 | En cas d'impayé, le système doit appliquer une période de grâce, puis passer le compte en lecture seule. Les ventes déjà enregistrées (y compris hors ligne) doivent toujours être synchronisées, et l'export des données doit rester possible. | P1 |
+| KOM-079 | À la fin de l'essai sans souscription, le compte passe en lecture seule avec export possible. Les données sont conservées pendant 90 jours *(hypothèse)* pour permettre la souscription, puis traitées selon la politique de conservation (section 20). | P1 |
 | KOM-075 | Le commerçant doit pouvoir passer à un plan supérieur (effet immédiat, au prorata) ou inférieur (effet à la fin de la période payée). | P1 |
-| KOM-076 | Le commerçant doit pouvoir résilier son abonnement : il reste actif jusqu'à la fin de la période payée, puis passe au plan gratuit, et ses données restent exportables. | P1 |
+| KOM-076 | Le commerçant doit pouvoir résilier son abonnement : il reste actif jusqu'à la fin de la période payée, puis le compte passe en lecture seule et ses données restent exportables. | P1 |
 | KOM-077 | Le commerçant doit pouvoir consulter l'historique de ses paiements d'abonnement et télécharger ses reçus ou factures. | P1 |
-| KOM-078 | L'état de l'abonnement (essai, actif, en retard, limité, résilié), la date d'échéance et les limites du plan doivent être visibles en permanence pour le propriétaire. | P1 |
+| KOM-078 | L'état de l'abonnement (essai, actif, en retard, lecture seule, résilié), la date d'échéance et les limites du plan doivent être visibles en permanence pour le propriétaire. | P1 |
 
 ### 4.9 Back-office de la plateforme
 
@@ -372,7 +373,8 @@ Le MVP est considéré comme livré lorsque les conditions suivantes sont rempli
 | Fraude ou erreur en caisse | Perte d'argent | Clôture de caisse, permissions sur remises et annulations, journal d'audit |
 | Manipulation de l'heure de l'appareil hors ligne | Données incohérentes | Horodatage appareil et serveur, détection d'écart, plafond de durée hors ligne |
 | Exigences réglementaires (paiement, fiscalité, données) | Blocage ou sanction | Agrégateur agréé, validation juridique locale avant lancement (section 20) |
-| Prix trop élevé pour la clientèle cible | Faible conversion payante | Offre gratuite, tarifs testés avec les pilotes, paiement mensuel en petites sommes (section 16) |
+| Prix trop élevé pour la clientèle cible | Faible conversion de l'essai vers l'abonnement | Tarifs testés avec les pilotes, paiement mensuel en petites sommes, essai donnant accès à toute la valeur du produit (section 16) |
+| Essai de 14 jours trop court pour un commerçant qui doit saisir catalogue et stock | Abandon avant d'avoir vu la valeur | Import du catalogue (CSV/Excel), assistant de démarrage, accompagnement par WhatsApp pendant l'essai, prolongation possible par le support |
 | Paiements mensuels oubliés ou manqués (paiement non automatique) | Churn involontaire, revenu irrégulier | Rappels multiples, paiement en quelques actions, période de grâce, relance par WhatsApp |
 | Dépendance d'un seul revenu (l'abonnement) | Revenu fragile si l'adoption est lente | Suivre MRR et conversion dès le pilote, maîtriser les coûts, revoir le modèle si les objectifs ne sont pas atteints |
 | Dépendance à un fournisseur de messagerie (WhatsApp/SMS) | Coûts et interruptions | Plafonds par plan, fournisseurs alternatifs, repli par SMS |
@@ -388,7 +390,8 @@ Le MVP est considéré comme livré lorsque les conditions suivantes sont rempli
 - Taux de rétention mensuelle des commerçants.
 - Note de satisfaction des utilisateurs pilotes.
 - Revenu mensuel récurrent (MRR) et revenu moyen par commerçant (ARPU).
-- Taux de conversion de l'offre gratuite vers une offre payante.
+- Taux de conversion de l'essai gratuit vers un abonnement payant.
+- Part des essais où le commerçant a enregistré au moins 10 ventes avant la fin de l'essai (indicateur d'activation).
 - Taux de désabonnement (churn) mensuel.
 - Taux de renouvellement mensuel à l'échéance et taux de paiements d'abonnement réussis.
 - Coût d'acquisition par commerçant rapporté à la valeur vie client (LTV).
@@ -403,16 +406,15 @@ Les cibles chiffrées seront fixées après la phase pilote.
 - **L'abonnement est la seule source de revenus de Komersia.** Il n'y a ni commission sur les ventes ou les paiements des commerçants, ni programme de partage de revenus avec des partenaires.
 - Le parcours est simple : **achat d'un plan, première souscription, puis paiement mensuel**.
 - Prix affichés en USD, payables en CDF ou en USD par Mobile Money.
-- Une offre gratuite et un essai gratuit favorisent l'adoption.
-- Les commerçants ne sont jamais pénalisés au point de perdre leurs données : l'export reste toujours possible et la caisse reste utilisable (KOM-074).
+- **Pas de plan gratuit permanent** : un essai gratuit de 14 jours permet au commerçant de comprendre le logiciel ; s'il est convaincu, il souscrit à un plan payant.
+- Le commerçant ne perd jamais ses données : l'export reste toujours possible, et les ventes déjà enregistrées sont toujours synchronisées, même si l'abonnement est en retard ou expiré (KOM-074, KOM-079).
 - Les paiements Mobile Money que les commerçants reçoivent de leurs clients ne génèrent aucun revenu pour Komersia. Les frais éventuels de l'opérateur ou de l'agrégateur sont à la charge de celui qui les supporte selon les conditions de l'opérateur, et ne sont pas prélevés par Komersia.
 
 ### 16.2 Plans d'abonnement
 
 | Plan | Cible | Contenu indicatif | Prix mensuel *(hypothèse)* |
 |---|---|---|---|
-| Gratuit | Petit commerçant qui démarre | 1 boutique, 1 utilisateur, catalogue limité, caisse hors ligne, rapports de base | 0 USD |
-| Essentiel | Commerce de détail | 1 boutique, 3 utilisateurs, catalogue illimité, clients et crédit, Mobile Money, reçus WhatsApp/SMS limités | 5 USD |
+| Essentiel | Petit commerce de détail | 1 boutique, 3 utilisateurs, catalogue illimité, caisse hors ligne, clients et crédit, Mobile Money, rapports de base, reçus WhatsApp/SMS limités | 5 USD |
 | Pro | Commerce établi | Jusqu'à 3 boutiques, 10 utilisateurs, achats et fournisseurs, factures et devis, exports, rapports avancés | 15 USD |
 | Business | Multi-boutiques, grossiste | Plus de boutiques et d'utilisateurs, modules sectoriels, accès API, support prioritaire | 40 USD, plus un supplément par boutique |
 
@@ -420,24 +422,23 @@ Le contenu exact des plans, les limites et les prix sont à valider par des entr
 
 ### 16.3 Cycle de vie de l'abonnement
 
-1. **Inscription.** Le commerçant démarre avec le plan Gratuit ou un essai de 14 jours *(hypothèse)* d'un plan payant, sans moyen de paiement (KOM-071).
-2. **Achat et première souscription.** Il choisit un plan, paie par Mobile Money et l'abonnement s'active dès la confirmation du paiement. Il reçoit un reçu (KOM-072). La date d'échéance est fixée à un mois après l'activation.
+1. **Essai gratuit de 14 jours.** À l'inscription, le commerçant accède au logiciel sans moyen de paiement, avec les fonctions du plan Pro *(hypothèse)*, pour comprendre la valeur du produit. Des rappels l'informent de la fin de l'essai (KOM-071).
+2. **Achat et première souscription.** S'il est convaincu, il choisit un plan, paie par Mobile Money et l'abonnement s'active dès la confirmation du paiement, sans attendre la fin de l'essai. Il reçoit un reçu (KOM-072). La date d'échéance est fixée à un mois après l'activation. S'il n'a pas souscrit à la fin de l'essai, le compte passe en lecture seule (KOM-079).
 3. **Paiement mensuel.** Le système rappelle l'échéance à 7 jours, 3 jours et le jour même. Le commerçant paie par Mobile Money, ce qui prolonge l'abonnement d'un mois à compter de l'échéance (KOM-073). Le Mobile Money se prête mal au prélèvement automatique : le paiement reste déclenché par le commerçant.
-4. **Retard de paiement.** Période de grâce de 7 jours *(hypothèse)*, puis limitation progressive des fonctions payantes. La caisse et l'export des données restent disponibles (KOM-074).
+4. **Retard de paiement.** Période de grâce de 7 jours *(hypothèse)* avec toutes les fonctions et des rappels, puis passage en lecture seule. L'export et la synchronisation des ventes déjà faites restent possibles (KOM-074).
 5. **Changement de plan.** Passage au plan supérieur immédiat, au prorata ; passage au plan inférieur à la fin de la période payée (KOM-075).
-6. **Résiliation.** L'abonnement reste actif jusqu'à la fin de la période payée, puis le compte passe au plan gratuit (KOM-076).
+6. **Résiliation.** L'abonnement reste actif jusqu'à la fin de la période payée, puis le compte passe en lecture seule (KOM-076).
 
 | État | Description | Accès |
 |---|---|---|
-| Essai | Période d'essai gratuite d'un plan payant | Toutes les fonctions du plan essayé |
-| Actif | Abonnement payé et à jour | Toutes les fonctions du plan |
+| Essai | 14 jours gratuits après l'inscription | Fonctions du plan Pro *(hypothèse)* |
+| Actif | Abonnement payé et à jour | Toutes les fonctions du plan souscrit |
 | En retard | Échéance dépassée, période de grâce en cours | Toutes les fonctions, avec rappels |
-| Limité | Grâce terminée sans paiement | Fonctions payantes limitées ; caisse et export disponibles |
-| Résilié | Résiliation effective | Plan gratuit |
+| Lecture seule | Essai terminé sans souscription, grâce terminée sans paiement, ou résiliation effective | Consultation, rapports et export ; plus de nouvelle vente ; synchronisation des ventes déjà faites |
 
 ### 16.4 Indicateurs économiques
 
-MRR, ARPU, conversion du plan gratuit ou de l'essai vers un plan payant, taux de renouvellement à l'échéance, taux de paiements d'abonnement réussis, churn, coût d'acquisition et LTV/CAC (voir section 15).
+MRR, ARPU, conversion de l'essai vers un abonnement payant, durée moyenne avant souscription, taux de renouvellement à l'échéance, taux de paiements d'abonnement réussis, churn, coût d'acquisition et LTV/CAC (voir section 15).
 
 ## 17. Jalons et feuille de route
 
@@ -565,7 +566,7 @@ Les points suivants sont à valider avec un conseil juridique local avant le lan
 | Rapports de base | M1 | KOM-060 à KOM-062, KOM-065 |
 | Paiements Mobile Money | M2 | KOM-031, KOM-034, KOM-035, section 18.6 |
 | Messagerie WhatsApp et SMS | M2 | KOM-024, KOM-054 |
-| Abonnement : achat, première souscription et paiement mensuel | M2 | KOM-070 à KOM-078 |
+| Abonnement : achat, première souscription et paiement mensuel | M2 | KOM-070 à KOM-079 |
 | Back-office plateforme | M2 | KOM-080 à KOM-083 |
 | Tests de sécurité et d'isolation | M2 | KOM-NF-006 à KOM-NF-009, KOM-NF-018 |
 | Achats et fournisseurs, inventaire | M3 | KOM-044 à KOM-046 |
