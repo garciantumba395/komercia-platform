@@ -1,0 +1,17 @@
+{% load static %}<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b5a34">
+  <title>{% block title %}Komersia{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'web/app.css' %}">
+</head>
+<body data-page="{{ page }}" data-public="{% if public %}1{% else %}0{% endif %}">
+  <a class="skip-link" href="#main">Aller au contenu</a>
+  {% block body %}{% endblock %}
+  <noscript><p class="noscript">Komersia a besoin de JavaScript pour fonctionner. Activez-le dans votre navigateur.</p></noscript>
+  <script src="{% static 'web/app.js' %}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
