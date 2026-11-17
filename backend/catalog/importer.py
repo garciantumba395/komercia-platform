@@ -86,7 +86,7 @@ def import_products(raw: bytes) -> dict:
                     category = None
                     if cell(record, "category"):
                         key = cell(record, "category").lower()
-                        category = categories.cell(record, key)
+                        category = categories.get(key)
                         if category is None:
                             category = Category.objects.create(name=cell(record, "category"))
                             categories[key] = category
