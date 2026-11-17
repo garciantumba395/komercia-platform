@@ -46,21 +46,18 @@ class ExchangeRateViewSet(
     }
 
     def get_queryset(self):
-        return ExchangeRate.objects.order_by("-effective_at", "-created_at")  # filtré par la RLS
+        qs = ExchangeRate.objects.order_by("-effective_at", "-created_at")  # filtré par la RLS
+        if self.action == "list":
+            store = _parse_store(self.request.query_params.get("store"))
+            if store == "default":
+                qs = qs.filter(store__isnull=True)
+            elif store is not None:
+                qs = qs.filter(store_id=store)
+        return qs
 
     @extend_schema(parameters=[STORE_PARAM])
     def list(self, request, *args, **kwargs):
-        store = _parse_store(request.query_params.get("store"))
-        if store == "default":
-            self.queryset_filter = {"store__isnull": True}
-        elif store is not None:
-            self.queryset_filter = {"store_id": store}
-        else:
-            self.queryset_filter = {}
         return super().list(request, *args, **kwargs)
-
-    def filter_queryset(self, queryset):
-        return queryset.filter(**getattr(self, "queryset_filter", {}))
 
     def perform_create(self, serializer):
         serializer.save(set_by=self.request.user)

@@ -5,8 +5,8 @@
 #   base_cible : par défaut RESTORE_DB_NAME, sinon "komersia_restore".
 #
 # Variables d'environnement (toutes facultatives) :
-#   DB_HOST (localhost)  DB_PORT (5432)
-#   DB_USER (komersia_owner)  DB_PASSWORD     rôle qui crée la base cible et en devient propriétaire
+#   DB_HOST (localhost ; vide = socket Unix)  DB_PORT (5432)
+#   RESTORE_DB_USER (komersia_owner)  RESTORE_DB_PASSWORD   rôle qui crée la base cible et en devient propriétaire
 #   RESTORE_DB_NAME                           base cible (alternative au 2e argument)
 #   APP_ROLE (komersia_app)                   rôle applicatif à qui rendre les droits après restauration
 #   RESTORE_DROP_EXISTING (0)                 1 = supprime la base cible si elle existe déjà
@@ -14,7 +14,7 @@
 #
 # Sécurité : la base cible ne doit PAS exister (sauf RESTORE_DROP_EXISTING=1), et le script refuse
 # de restaurer sur la base de travail "komersia" sans confirmation explicite (RESTORE_ALLOW_PRIMARY=1).
-# Le rôle DB_USER doit avoir CREATEDB (komersia_owner l'a, voir scripts/db-init.sql).
+# Le rôle RESTORE_DB_USER doit avoir CREATEDB (komersia_owner l'a, voir scripts/db-init.sql).
 set -euo pipefail
 
 if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
@@ -24,9 +24,9 @@ fi
 
 FICHIER="$1"
 CIBLE="${2:-${RESTORE_DB_NAME:-komersia_restore}}"
-DB_HOST="${DB_HOST:-localhost}"
+DB_HOST="${DB_HOST-localhost}"
 DB_PORT="${DB_PORT:-5432}"
-DB_USER="${DB_USER:-komersia_owner}"
+RESTORE_DB_USER="${RESTORE_DB_USER:-komersia_owner}"
 APP_ROLE="${APP_ROLE:-komersia_app}"
 PG_RESTORE="${PG_RESTORE:-pg_restore}"
 PSQL="${PSQL:-psql}"
@@ -41,11 +41,13 @@ if [ "$CIBLE" = "komersia" ] && [ "${RESTORE_ALLOW_PRIMARY:-0}" != "1" ]; then
   exit 3
 fi
 
-if [ -n "${DB_PASSWORD:-}" ]; then
-  export PGPASSWORD="$DB_PASSWORD"
+if [ -n "${RESTORE_DB_PASSWORD:-}" ]; then
+  export PGPASSWORD="$RESTORE_DB_PASSWORD"
 fi
+HOTE=()
+if [ -n "$DB_HOST" ]; then HOTE=(--host "$DB_HOST"); fi
 
-psql_admin() { "$PSQL" --host "$DB_HOST" --port "$DB_PORT" --username "$DB_USER" --dbname postgres \
+psql_admin() { "$PSQL" "${HOTE[@]}" --port "$DB_PORT" --username "$RESTORE_DB_USER" --dbname postgres \
   --no-password -v ON_ERROR_STOP=1 -At "$@"; }
 
 EXISTE="$(psql_admin -c "SELECT 1 FROM pg_database WHERE datname = '$CIBLE'")"
@@ -59,18 +61,18 @@ if [ -n "$EXISTE" ]; then
   fi
 fi
 
-echo "Création de la base $CIBLE (propriétaire ${DB_USER})..."
-psql_admin -c "CREATE DATABASE \"$CIBLE\" OWNER \"$DB_USER\""
+echo "Création de la base $CIBLE (propriétaire ${RESTORE_DB_USER})..."
+psql_admin -c "CREATE DATABASE \"$CIBLE\" OWNER \"$RESTORE_DB_USER\""
 
 echo "Restauration de $FICHIER vers $CIBLE..."
 # --no-owner / --no-acl : tout appartient au rôle de restauration (propriétaire), les droits applicatifs
 # sont rejoués ci-dessous. Les politiques RLS font partie des objets restaurés.
-"$PG_RESTORE" --host "$DB_HOST" --port "$DB_PORT" --username "$DB_USER" --dbname "$CIBLE" \
+"$PG_RESTORE" "${HOTE[@]}" --port "$DB_PORT" --username "$RESTORE_DB_USER" --dbname "$CIBLE" \
   --no-password --no-owner --no-acl --exit-on-error "$FICHIER"
 
 # Rejoue les privilèges du rôle applicatif (non propriétaire, soumis à la RLS), si ce rôle existe.
 if [ -n "$(psql_admin -c "SELECT 1 FROM pg_roles WHERE rolname = '$APP_ROLE'")" ]; then
-  "$PSQL" --host "$DB_HOST" --port "$DB_PORT" --username "$DB_USER" --dbname "$CIBLE" --no-password \
+  "$PSQL" "${HOTE[@]}" --port "$DB_PORT" --username "$RESTORE_DB_USER" --dbname "$CIBLE" --no-password \
     -v ON_ERROR_STOP=1 -q <<SQL
 GRANT USAGE ON SCHEMA public TO "$APP_ROLE";
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "$APP_ROLE";

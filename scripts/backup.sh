@@ -3,22 +3,25 @@
 #
 # Variables d'environnement (toutes facultatives) :
 #   DB_HOST (localhost)  DB_PORT (5432)  DB_NAME (komersia)
-#   DB_USER (komersia_owner)  DB_PASSWORD (transmis à pg_dump via PGPASSWORD)
+#   BACKUP_DB_USER (komersia_backup)  BACKUP_DB_PASSWORD (transmis à pg_dump via PGPASSWORD)
 #   BACKUP_DIR (./backups)            dossier de destination
 #   BACKUP_RETENTION_DAYS (14)        supprime les sauvegardes plus anciennes ; 0 = pas de rotation
 #   BACKUP_PREFIX (komersia)          préfixe des fichiers
 #   PG_DUMP (pg_dump)                 commande à utiliser
 #
-# Le rôle utilisé doit pouvoir lire toutes les lignes : utiliser le PROPRIÉTAIRE (komersia_owner),
-# jamais le rôle applicatif, qui est soumis à la Row-Level Security et produirait une sauvegarde vide.
+# IMPORTANT : les tables métier utilisent FORCE ROW LEVEL SECURITY, qui s'applique même au rôle
+# propriétaire : pg_dump échoue (ou produirait une sauvegarde vide) avec komersia_owner ou komersia_app.
+# Le rôle de sauvegarde doit donc avoir l'attribut BYPASSRLS : c'est le rôle dédié `komersia_backup`
+# créé par scripts/db-init.sql (lecture seule : pg_read_all_data). Un super-utilisateur convient aussi.
+# DB_HOST peut être vide pour utiliser le socket Unix local (authentification « peer »).
 #
-# Exemple : DB_PASSWORD=... BACKUP_DIR=/var/backups/komersia ./scripts/backup.sh
+# Exemple : BACKUP_DB_PASSWORD=... BACKUP_DIR=/var/backups/komersia ./scripts/backup.sh
 set -euo pipefail
 
-DB_HOST="${DB_HOST:-localhost}"
+DB_HOST="${DB_HOST-localhost}"
 DB_PORT="${DB_PORT:-5432}"
 DB_NAME="${DB_NAME:-komersia}"
-DB_USER="${DB_USER:-komersia_owner}"
+BACKUP_DB_USER="${BACKUP_DB_USER:-komersia_backup}"
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-14}"
 BACKUP_PREFIX="${BACKUP_PREFIX:-komersia}"
@@ -28,9 +31,11 @@ case "$BACKUP_RETENTION_DAYS" in
   ''|*[!0-9]*) echo "BACKUP_RETENTION_DAYS doit être un entier positif ou nul." >&2; exit 2 ;;
 esac
 
-if [ -n "${DB_PASSWORD:-}" ]; then
-  export PGPASSWORD="$DB_PASSWORD"
+if [ -n "${BACKUP_DB_PASSWORD:-}" ]; then
+  export PGPASSWORD="$BACKUP_DB_PASSWORD"
 fi
+HOTE=()
+if [ -n "$DB_HOST" ]; then HOTE=(--host "$DB_HOST"); fi
 
 mkdir -p "$BACKUP_DIR"
 umask 077
@@ -42,8 +47,8 @@ TEMPORAIRE="$FICHIER.partial"
 # Nettoyage du fichier partiel en cas d'échec : on ne laisse jamais une sauvegarde incomplète.
 trap 'rm -f "$TEMPORAIRE"' EXIT
 
-echo "Sauvegarde de ${DB_NAME} sur ${DB_HOST}:${DB_PORT} (utilisateur ${DB_USER})..."
-"$PG_DUMP" --host "$DB_HOST" --port "$DB_PORT" --username "$DB_USER" --dbname "$DB_NAME" \
+echo "Sauvegarde de ${DB_NAME} sur ${DB_HOST}:${DB_PORT} (utilisateur ${BACKUP_DB_USER})..."
+"$PG_DUMP" "${HOTE[@]}" --port "$DB_PORT" --username "$BACKUP_DB_USER" --dbname "$DB_NAME" \
   --format=custom --compress=6 --no-password --file "$TEMPORAIRE"
 
 # Vérification : l'archive doit être lisible par pg_restore.

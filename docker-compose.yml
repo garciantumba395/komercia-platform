@@ -15,6 +15,7 @@ services:
       # Lus par scripts/docker-initdb.sh pour créer les rôles komersia_owner / komersia_app.
       KOMERSIA_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?définir DB_OWNER_PASSWORD dans .env}
       KOMERSIA_APP_PASSWORD: ${DB_PASSWORD:?définir DB_PASSWORD dans .env}
+      KOMERSIA_BACKUP_PASSWORD: ${BACKUP_DB_PASSWORD:?définir BACKUP_DB_PASSWORD dans .env}
     volumes:
       - db_data:/var/lib/postgresql/data
       # Initialisation au premier démarrage uniquement (volume vide) : rôles, base, privilèges.
