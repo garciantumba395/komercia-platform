@@ -271,3 +271,14 @@ td.num, th.num { text-align: right; white-space: nowrap; }
   .topbar, .sidenav, .toasts, .btn, .cart-bar { display: none !important; }
   .content { margin: 0; }
 }
+
+/* Petits écrans : la barre du haut ne doit jamais déborder. */
+.topbar-info { flex: 1; justify-content: flex-end; }
+.topbar-info > span { min-width: 0; }
+.chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.topbar .menu-toggle { padding: .3rem .7rem; }
+@media (max-width: 520px) {
+  .brand span:last-child { display: none; }
+  .topbar-info { flex-direction: column; align-items: flex-end; gap: .15rem; }
+  .topbar-info select { max-width: 130px; }
+}

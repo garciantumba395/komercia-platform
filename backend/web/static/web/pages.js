@@ -635,6 +635,7 @@
     async function loadReport() {
       clear(salesBox);
       clear(topBox);
+      topBox.hidden = false;
       try {
         const r = await api('reports/daily/?store=' + ctx.store.id + '&date=' + (date.value || K.todayISO()));
         salesBox.appendChild(h('div', { class: 'kpis' },
@@ -648,6 +649,7 @@
           h('div', { class: 'main' }, h('div', { class: 'title' }, (i + 1) + '. ' + t.name), h('div', { class: 'sub' }, fmtQty(t.quantity) + ' vendu(s)')),
           h('div', { class: 'amount' }, fmt(t.revenue_minor, t.currency)))));
       } catch (e) {
+        topBox.hidden = true;
         salesBox.appendChild(K.alertBox(unavailable(e) || (e.status === 404) ? 'Rapports bientôt disponibles. Les dettes et les ruptures ci-dessous sont déjà à jour.' : e.message, unavailable(e) || e.status === 404 ? 'info' : 'error'));
       }
     }

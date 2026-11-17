@@ -127,7 +127,10 @@
             S.session = await api('sales/cash-sessions/open/', { method: 'POST', body: { store: ctx.store.id, opening_float: { CDF: c, USD: u } } });
             toast('Caisse ouverte.', 'ok');
             startPos();
-          } catch (ex) { err.appendChild(errorBox(ex.status === 404 && !ex.data ? 'Le module des ventes n’est pas encore disponible sur ce serveur.' : ex.message)); }
+          } catch (ex) {
+            if (ex.status === 409) { toast('La caisse est déjà ouverte.', 'ok'); checkSession(); return; }
+            err.appendChild(errorBox(ex.status === 404 && !ex.data ? 'Le module des ventes n’est pas encore disponible sur ce serveur.' : ex.message));
+          }
         });
       });
       view.appendChild(form);
@@ -330,7 +333,7 @@
             h('button', { type: 'button', class: 'btn btn-ghost btn-small', onclick: () => { S.customer = null; S.mode = 'cash'; renderCustomer(); renderModeToggle(); refresh(); } }, 'Changer')));
           return;
         }
-        const input = h('input', { type: 'search', placeholder: 'Nom ou téléphone du client (facultatif)', 'aria-label': 'Rechercher un client', autocomplete: 'off' });
+        const input = h('input', { type: 'search', placeholder: 'Nom ou téléphone (facultatif)', 'aria-label': 'Rechercher un client', autocomplete: 'off' });
         const results = h('div');
         const doSearch = K.debounce(async () => {
           const q = input.value.trim();
@@ -595,8 +598,14 @@
           } else if (e.status === 404 && !e.data) {
             S.clientId = null;
             cartError.appendChild(errorBox('Le module des ventes n’est pas encore disponible sur ce serveur.'));
+          } else if (e.status === 409) {
+            S.clientId = null;
+            cartError.appendChild(errorBox(e.message + ' Le panier a changé depuis la dernière tentative : vérifiez la liste des ventes du jour puis réessayez.'));
           } else {
             cartError.appendChild(errorBox(e.message));
+            if (/taux de change/i.test(e.message)) {
+              cartError.appendChild(h('a', { class: 'btn btn-secondary', href: '/app/taux/' }, 'Saisir le taux de change'));
+            }
             if (/caisse/i.test(e.message) && /ouvr/i.test(e.message)) {
               cartError.appendChild(h('button', { type: 'button', class: 'btn btn-secondary', onclick: checkSession }, 'Ouvrir la caisse'));
             }

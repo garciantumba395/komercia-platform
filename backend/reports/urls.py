@@ -1,3 +1,9 @@
-from django.urls import path  # noqa: F401
+from django.urls import path
 
-urlpatterns: list = []
+from .views import DailyReportView, ExportView, SummaryReportView
+
+urlpatterns = [
+    path("daily/", DailyReportView.as_view(), name="reports-daily"),
+    path("summary/", SummaryReportView.as_view(), name="reports-summary"),
+    path("export/", ExportView.as_view(), name="reports-export"),
+]
