@@ -71,7 +71,8 @@ def test_phone_normalisation_and_role_rules():
     got = run([
         ["normalizePhone", ["0990 000 001"]], ["normalizePhone", ["243990000001"]],
         ["normalizePhone", ["+243990000001"]],
-        ["canWrite.cancel", ["owner"]], ["canWrite.cancel", ["cashier"]], ["canWrite.cancel", ["storekeeper"]],
+        ["canWrite.cancel", ["owner"]], ["canWrite.cancel", ["cashier"]],
+        ["canWrite.cancel", ["storekeeper"]],
         ["canWrite.products", ["manager"]], ["canWrite.products", ["storekeeper"]],
         ["canWrite.stock", ["storekeeper"]],
     ])
