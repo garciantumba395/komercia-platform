@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 
+from audit import services as audit
 from core.permissions import ACCOUNTANT, CASHIER, MANAGER, OWNER, STOREKEEPER, HasRole
 
 from . import services
@@ -60,7 +61,9 @@ class ExchangeRateViewSet(
         return super().list(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        serializer.save(set_by=self.request.user)
+        rate = serializer.save(set_by=self.request.user)
+        audit.log("exchange_rate.set", "exchangerate", rate.pk, request=self.request,
+                  after=audit.snapshot(rate))
 
     @extend_schema(parameters=[STORE_PARAM], responses=ExchangeRateSerializer)
     @action(detail=False, methods=["get"], url_path="current")

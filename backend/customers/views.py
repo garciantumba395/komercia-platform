@@ -9,6 +9,8 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from audit import services as audit
+from audit.mixins import AuditedMixin
 from core.permissions import ACCOUNTANT, CASHIER, MANAGER, OWNER, HasRole
 
 from . import services
@@ -21,7 +23,8 @@ LIMIT_ROLES = [OWNER, MANAGER]
 LIMIT_FIELDS = ("credit_limit_minor", "credit_limit_currency")
 
 
-class CustomerViewSet(viewsets.ModelViewSet):
+class CustomerViewSet(AuditedMixin, viewsets.ModelViewSet):
+    audit_entity_type = "customer"
     serializer_class = CustomerSerializer
     permission_classes = [HasRole]
     allowed_roles_by_action = {
@@ -60,11 +63,22 @@ class CustomerViewSet(viewsets.ModelViewSet):
         self._guard_limit(request)
         return super().update(request, *args, **kwargs)
 
+    def perform_update(self, serializer):
+        before = audit.snapshot(serializer.instance, LIMIT_FIELDS)
+        super().perform_update(serializer)  # journalise customer.update
+        after = audit.snapshot(serializer.instance, LIMIT_FIELDS)
+        if before != after:
+            audit.log("credit_limit.change", "customer", serializer.instance.pk, before=before,
+                      after=after, request=self.request, **self._audit_extra())
+
     def destroy(self, request, *args, **kwargs):
         customer = self.get_object()
         if customer.credit_entries.exists():
+            before = audit.snapshot(customer)
             customer.is_active = False
             customer.save(update_fields=["is_active", "updated_at"])
+            audit.log("customer.deactivate", "customer", customer.pk, before=before,
+                      after=audit.snapshot(customer), request=request, **self._audit_extra())
             return Response({"detail": "Client avec historique de crédit : désactivé, non supprimé."},
                             status=status.HTTP_409_CONFLICT)
         return super().destroy(request, *args, **kwargs)
@@ -91,6 +105,9 @@ class CustomerViewSet(viewsets.ModelViewSet):
             entry = services.register_payment(customer, user=request.user, **s.validated_data)
         except services.CreditError as e:
             return Response({"detail": e.message}, status=status.HTTP_400_BAD_REQUEST)
+        audit.log("debt.payment", "creditentry", entry.pk, request=request,
+                  after={"customer_id": customer.pk, "amount_minor": entry.amount_minor,
+                         "currency": entry.currency, "method": entry.method, "note": entry.note})
         entry = CreditEntry.objects.prefetch_related("allocations_made").get(pk=entry.pk)
         return Response({"entry": CreditEntrySerializer(entry).data,
                          "balance": services.get_balance(customer)}, status=status.HTTP_201_CREATED)

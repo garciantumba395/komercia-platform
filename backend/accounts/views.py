@@ -4,6 +4,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from audit import services as audit
+from audit.mixins import AuditedMixin
 from core.permissions import ACCOUNTANT, CASHIER, MANAGER, OWNER, STOREKEEPER, HasRole
 
 from .models import Membership, Store, User
@@ -66,7 +68,8 @@ class MeView(APIView):
         )
 
 
-class StoreViewSet(viewsets.ModelViewSet):
+class StoreViewSet(AuditedMixin, viewsets.ModelViewSet):
+    audit_entity_type = "store"
     serializer_class = StoreSerializer
     permission_classes = [HasRole]
     allowed_roles_by_action = {
@@ -100,6 +103,9 @@ class MemberViewSet(viewsets.ViewSet):
         user = User.objects.create_user(phone=data["phone"], password=data["password"],
                                         full_name=data["full_name"])
         member = Membership.objects.create(user=user, tenant=request.tenant, role=data["role"])
+        audit.log("user.create", "user", user.id, request=request,
+                  after={"user_id": user.id, "full_name": user.full_name, "phone": user.phone,
+                         "role": member.role, "is_active": member.is_active})
         return Response(MemberSerializer(member).data, status=status.HTTP_201_CREATED)
 
     def partial_update(self, request, pk=None):
@@ -108,7 +114,16 @@ class MemberViewSet(viewsets.ViewSet):
             return Response(status=404)
         if member.user_id == request.user.id:
             return Response({"detail": "Vous ne pouvez pas modifier votre propre rôle."}, 400)
+        before = {"role": member.role, "is_active": member.is_active}
         if "is_active" in request.data:
             member.is_active = bool(request.data["is_active"])
         member.save()
+        after = {"role": member.role, "is_active": member.is_active}
+        if after["role"] != before["role"]:
+            audit.log("user.role_change", "user", member.user_id, request=request,
+                      before={"role": before["role"]}, after={"role": after["role"]})
+        if after["is_active"] != before["is_active"]:
+            audit.log("user.reactivate" if after["is_active"] else "user.deactivate", "user",
+                      member.user_id, request=request,
+                      before={"is_active": before["is_active"]}, after={"is_active": after["is_active"]})
         return Response(MemberSerializer(member).data)

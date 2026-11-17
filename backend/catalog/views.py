@@ -9,6 +9,8 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
+from audit import services as audit
+from audit.mixins import AuditedMixin
 from core.permissions import HasRole
 
 from .importer import COLUMNS, ImportFileError, import_products
@@ -30,7 +32,11 @@ TRUE = {"1", "true", "yes", "oui"}
 FALSE = {"0", "false", "no", "non"}
 
 
-class CategoryViewSet(viewsets.ModelViewSet):
+PRICE_FIELDS = ["price_minor", "cost_minor", "currency"]
+
+
+class CategoryViewSet(AuditedMixin, viewsets.ModelViewSet):
+    audit_entity_type = "category"
     serializer_class = CategorySerializer
     permission_classes = [HasRole]
     allowed_roles_by_action = CRUD_ROLES
@@ -40,7 +46,8 @@ class CategoryViewSet(viewsets.ModelViewSet):
         return Category.objects.order_by("name")
 
 
-class ProductViewSet(viewsets.ModelViewSet):
+class ProductViewSet(AuditedMixin, viewsets.ModelViewSet):
+    audit_entity_type = "product"
     serializer_class = ProductSerializer
     permission_classes = [HasRole]
     parser_classes = [JSONParser, FormParser, MultiPartParser]
@@ -75,6 +82,14 @@ class ProductViewSet(viewsets.ModelViewSet):
             qs = qs.filter(is_active=False)
         return qs
 
+    def perform_update(self, serializer):
+        before = audit.snapshot(serializer.instance, PRICE_FIELDS)
+        super().perform_update(serializer)  # journalise product.update
+        after = audit.snapshot(serializer.instance, PRICE_FIELDS)
+        if before != after:
+            audit.log("price.change", "product", serializer.instance.pk, before=before, after=after,
+                      request=self.request, **self._audit_extra())
+
     def destroy(self, request, *args, **kwargs):
         try:
             return super().destroy(request, *args, **kwargs)
@@ -95,6 +110,9 @@ class ProductViewSet(viewsets.ModelViewSet):
             report = import_products(upload.read())
         except ImportFileError as exc:
             raise ValidationError({"file": str(exc)}) from None
+        audit.log("product.import", "product", "import", request=request,
+                  after={"total": report["total"], "created": report["created"],
+                         "failed": report["failed"]})
         return Response(report)
 
     @action(detail=False, methods=["get"], url_path="export", url_name="export")

@@ -5,12 +5,13 @@ from rest_framework import mixins, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from audit import services as audit
 from catalog.permissions import ALL_ROLES
 from core.permissions import MANAGER, OWNER, STOREKEEPER, HasRole
 
 from .models import StockLevel, StockMovement
 from .serializers import MovementCreateSerializer, StockLevelSerializer, StockMovementSerializer
-from .services import InsufficientStock, apply_movement
+from .services import InsufficientStock, apply_movement, get_quantity
 
 ADJUST_ROLES = [OWNER, MANAGER, STOREKEEPER]
 
@@ -86,6 +87,7 @@ class StockMovementViewSet(
         serializer = MovementCreateSerializer(data=request.data, context=self.get_serializer_context())
         serializer.is_valid(raise_exception=True)
         d = serializer.validated_data
+        quantity_before = get_quantity(d["product"], d["store"])
         try:
             movement = apply_movement(
                 d["product"], d["store"], d["delta"], d["kind"],
@@ -95,4 +97,14 @@ class StockMovementViewSet(
             )
         except InsufficientStock as exc:
             raise ValidationError({"quantity": str(exc)}) from None
+        if movement is not None:
+            codes = ["stock.movement"] + (["stock.adjust"] if movement.kind == "adjustment" else [])
+            for code in codes:
+                audit.log(code, "stockmovement", movement.id, request=request,
+                          before={"quantity": quantity_before},
+                          after={"kind": movement.kind, "product_id": movement.product_id,
+                                 "store_id": movement.store_id, "delta": movement.quantity,
+                                 "quantity": quantity_before + movement.quantity,
+                                 "reference": movement.reference},
+                          reason=movement.reason)
         return Response(StockMovementSerializer(movement, context={"request": request}).data, status=201)
