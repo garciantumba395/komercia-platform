@@ -28,6 +28,7 @@
     { id: 'dashboard', href: '/app/tableau-de-bord/', label: 'Tableau de bord', icon: '📊', roles: ['owner', 'manager', 'accountant'] },
     { id: 'rates', href: '/app/taux/', label: 'Taux de change', icon: '💱', roles: ['owner', 'manager', 'accountant'] },
     { id: 'users', href: '/app/utilisateurs/', label: 'Utilisateurs', icon: '🔑', roles: ['owner'] },
+    { id: 'billing', href: '/app/abonnement/', label: 'Abonnement', icon: '💳', roles: ['owner', 'manager', 'accountant'] },
   ];
   K.ROLE_LABELS = ROLE_LABELS;
   const canOpen = (id, role) => NAV.some((n) => n.id === id && n.roles.includes(role));
@@ -122,6 +123,68 @@
   }
 
   Object.assign(K, { fmt, parseAmount, toInput, rateScaled, convert, paidInCurrency, fmtQty, fmtDateTime, fmtDate, todayISO, dayOf, fmtMap });
+
+  /* ---------- Abonnement : logique pure (bandeau, libellés) ---------- */
+  const BILLING_READERS = ['owner', 'manager', 'accountant']; // l'API de facturation est interdite aux autres rôles
+  const PAYMENT_STATUS = {
+    pending: ['En attente', 'warn'], confirmed: ['Confirmé', 'ok'], failed: ['Échoué', 'danger'], expired: ['Expiré', 'muted'],
+  };
+  const PAYMENT_KINDS = { subscribe: 'Abonnement', upgrade: 'Complément de plan' };
+  const STATE_LABELS = { trial: 'Essai gratuit', active: 'Actif', past_due: 'Paiement en retard', read_only: 'Lecture seule' };
+  const NOTICE_TEXTS = {
+    trial_7: 'Votre essai gratuit se termine dans 7 jours.',
+    trial_3: 'Votre essai gratuit se termine dans 3 jours.',
+    trial_1: 'Votre essai gratuit se termine demain.',
+    trial_0: 'Votre essai gratuit se termine aujourd’hui.',
+    due_7: 'Votre abonnement arrive à échéance dans 7 jours.',
+    due_3: 'Votre abonnement arrive à échéance dans 3 jours.',
+    due_0: 'Votre abonnement arrive à échéance aujourd’hui.',
+    past_due: 'Paiement en retard : payez pour éviter le passage en lecture seule.',
+    read_only: 'Votre abonnement est terminé : le compte est en lecture seule.',
+  };
+  const INACTIVE_MESSAGE = 'Abonnement terminé. Demandez au propriétaire de s’abonner.';
+
+  /** « 5 jours restants », « 1 jour restant », « Dernier jour ». */
+  function daysLabel(n) {
+    const d = Number(n);
+    if (!Number.isFinite(d) || d <= 0) return 'Dernier jour';
+    return d === 1 ? '1 jour restant' : d + ' jours restants';
+  }
+
+  /** Bandeau global selon l'état de l'abonnement : { tone: info|warn|danger, text, action } ou null. */
+  function bannerFor(sub, role) {
+    if (!sub) return null;
+    const owner = role === 'owner';
+    const d = Number(sub.days_left);
+    const action = (label) => ({ label: owner ? label : 'Voir l’abonnement', href: '/app/abonnement/' });
+    if (sub.state === 'trial') {
+      const text = d <= 0 ? 'Dernier jour d’essai gratuit.' : d === 1 ? 'Il vous reste 1 jour d’essai.' : 'Il vous reste ' + d + ' jours d’essai.';
+      return { tone: d <= 3 ? 'warn' : 'info', text, action: action('S’abonner') };
+    }
+    if (sub.state === 'past_due') {
+      const grace = d <= 0 ? 'dernier jour de grâce' : d === 1 ? '1 jour de grâce' : d + ' jours de grâce';
+      return { tone: 'warn', text: 'Paiement attendu : ' + grace + ' avant le passage en lecture seule.', action: action('Payer') };
+    }
+    if (sub.state === 'read_only') {
+      return {
+        tone: 'danger',
+        text: 'Abonnement terminé : consultation et export seulement.' + (owner ? '' : ' Demandez au propriétaire de s’abonner.'),
+        action: action('S’abonner'),
+      };
+    }
+    if (sub.state === 'active' && sub.cancel_at_period_end) {
+      return { tone: 'info', text: 'Abonnement résilié : il reste actif jusqu’au ' + fmtDate(sub.current_period_end) + '.', action: action('Reprendre') };
+    }
+    return null;
+  }
+  const paymentStatus = (s) => (PAYMENT_STATUS[s] || [String(s || ''), 'muted']);
+  const paymentStatusLabel = (s) => paymentStatus(s)[0];
+  const isReadOnly = () => !!((K.ctx.sub && K.ctx.sub.state === 'read_only') || K.ctx.inactive);
+  K.billing = {
+    READERS: BILLING_READERS, PAYMENT_KINDS, STATE_LABELS, NOTICE_TEXTS, INACTIVE_MESSAGE,
+    daysLabel, bannerFor, paymentStatus, paymentStatusLabel, isReadOnly,
+    canRead: (role) => BILLING_READERS.includes(role),
+  };
 
   /* ---------- DOM ---------- */
   function h(tag, props, ...kids) {
@@ -270,7 +333,7 @@
   }
 
   function logout(redirect) {
-    ['kom_token', 'kom_role', 'kom_name', 'kom_tenant'].forEach(store.del);
+    ['kom_token', 'kom_role', 'kom_name', 'kom_tenant', 'kom_welcome'].forEach(store.del);
     if (redirect === 'expired') window.location.replace('/app/connexion/?expired=1');
     else if (redirect !== false) window.location.replace('/app/connexion/');
   }
@@ -297,6 +360,11 @@
     if (!res.ok) {
       let data = null;
       if (isJson) { try { data = await res.json(); } catch (e) { data = null; } }
+      if (res.status === 402 && data && data.code === 'subscription_inactive') {
+        K.onSubscriptionInactive();
+        throw new ApiError(402, data, store.get('kom_role') === 'owner'
+          ? 'Abonnement terminé. Abonnez-vous depuis la page Abonnement pour reprendre les ventes.' : INACTIVE_MESSAGE);
+      }
       throw new ApiError(res.status, data, describe(res.status, data, isJson));
     }
     if (res.status === 204) return null;
@@ -359,6 +427,18 @@
       body.appendChild(h('div', { class: 'btn-row' }, h('button', { type: 'button', class: 'btn', onclick: () => frame.contentWindow.print() }, 'Imprimer')));
     });
   }
+  /** Ouvre un document HTML de l'API (reçu d'abonnement) dans un nouvel onglet, sans impression automatique. */
+  async function openHtml(path) {
+    const w = window.open('', '_blank'); // ouvert tout de suite : sinon le navigateur bloque la fenêtre
+    try {
+      const html = await api(path, { text: true, accept: 'text/html' });
+      if (w) { w.document.open(); w.document.write(html); w.document.close(); w.focus(); } else showReceiptModal(html);
+    } catch (e) {
+      if (w) w.close();
+      toast(e.message, 'error');
+    }
+  }
+  K.openHtml = openHtml;
   K.printReceipt = printReceipt;
   K.showReceiptModal = showReceiptModal;
 
@@ -416,6 +496,55 @@
   }
   K.refreshRate = () => loadRate(K.ctx);
 
+  /* ---------- Bandeau d'abonnement (toutes les pages privées) ---------- */
+  function renderBanner(b) {
+    const slot = document.getElementById('sub-banner');
+    if (!slot) return;
+    clear(slot);
+    slot.hidden = !b;
+    if (!b) return;
+    slot.className = 'sub-banner tone-' + b.tone;
+    slot.append(h('span', { class: 'sub-banner-text' }, b.text));
+    if (b.action) slot.append(h('a', { class: 'btn btn-small sub-banner-btn', href: b.action.href }, b.action.label));
+  }
+  K.renderBanner = renderBanner;
+
+  /** Relit l'état de l'abonnement (rôles autorisés uniquement) et met à jour le bandeau. */
+  async function refreshSubscription() {
+    const ctx = K.ctx;
+    if (!K.billing.canRead(ctx.role)) return null;
+    try {
+      ctx.sub = await api('billing/subscription/');
+      ctx.inactive = false;
+    } catch (e) {
+      ctx.sub = null; // module de facturation indisponible : pas de bandeau
+    }
+    renderBanner(K.billing.bannerFor(ctx.sub, ctx.role));
+    return ctx.sub;
+  }
+  K.refreshSubscription = refreshSubscription;
+
+  /** Une écriture a reçu 402 : l'abonnement est terminé, on l'indique sur toutes les pages. */
+  K.onSubscriptionInactive = function () {
+    const ctx = K.ctx;
+    ctx.inactive = true;
+    if (K.billing.canRead(ctx.role)) {
+      if (!ctx.sub || ctx.sub.state !== 'read_only') refreshSubscription().then(() => { ctx.inactive = true; });
+    } else {
+      renderBanner({ tone: 'danger', text: INACTIVE_MESSAGE, action: null });
+    }
+  };
+
+  function showWelcome() {
+    const area = document.getElementById('sub-area');
+    if (!area || !store.get('kom_welcome')) return;
+    store.del('kom_welcome');
+    const box = h('div', { class: 'alert alert-ok welcome', role: 'status' },
+      h('span', null, 'Bienvenue sur Komersia ! Votre essai gratuit de 14 jours commence aujourd’hui : toutes les fonctions du plan Pro sont disponibles, sans carte ni paiement.'),
+      h('button', { type: 'button', class: 'btn btn-small btn-ghost', onclick: () => box.remove() }, 'Fermer'));
+    area.appendChild(box);
+  }
+
   async function bootPrivate(page, view) {
     const ctx = K.ctx;
     if (!store.get('kom_token')) {
@@ -462,7 +591,8 @@
     } else if (ctx.store) {
       slot.appendChild(h('span', { class: 'chip' }, ctx.store.name));
     }
-    await loadRate(ctx);
+    await Promise.all([loadRate(ctx), refreshSubscription()]);
+    showWelcome();
 
     const render = K.pages[page];
     if (!render) { clear(view).appendChild(alertBox('Page inconnue.')); return; }
@@ -555,6 +685,7 @@
           });
           saveSession(data);
           if (data.store) store.set('kom_store', data.store.id);
+          store.set('kom_welcome', '1'); // message d'accueil : l'essai de 14 jours vient de démarrer
           window.location.replace('/app/caisse/');
         } catch (err) { errorSlot.appendChild(alertBox(err.message)); }
       });

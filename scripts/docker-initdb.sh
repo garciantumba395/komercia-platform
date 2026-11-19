@@ -6,5 +6,6 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres \
   -v owner_password="${KOMERSIA_OWNER_PASSWORD:?KOMERSIA_OWNER_PASSWORD manquant}" \
   -v app_password="${KOMERSIA_APP_PASSWORD:?KOMERSIA_APP_PASSWORD manquant}" \
   -v backup_password="${KOMERSIA_BACKUP_PASSWORD:?KOMERSIA_BACKUP_PASSWORD manquant}" \
+  -v ops_password="${KOMERSIA_OPS_PASSWORD:?KOMERSIA_OPS_PASSWORD manquant}" \
   -v db_name="${POSTGRES_DB:-komersia}" \
   -f /opt/komersia/db-init.sql

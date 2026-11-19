@@ -42,6 +42,9 @@ jobs:
       DB_NAME: komersia
       DB_USER: komersia_owner
       DB_PASSWORD: ci-owner-password
+      # Console d'exploitation (alias `ops`) : rôle komersia_ops créé par scripts/db-init.sql.
+      DB_OPS_USER: komersia_ops
+      DB_OPS_PASSWORD: ci-ops-password
       DJANGO_SECRET_KEY: ci-only-not-a-secret
       DJANGO_DEBUG: "0"
       DJANGO_ALLOWED_HOSTS: localhost
@@ -76,6 +79,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 \
             -v owner_password="$DB_PASSWORD" \
             -v app_password=ci-app-password \
+            -v ops_password=ci-ops-password \
             -v db_name="$DB_NAME" \
             -f scripts/db-init.sql
 

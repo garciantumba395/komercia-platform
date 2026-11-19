@@ -12,6 +12,7 @@ PAGES = {
     "sales": ("Ventes du jour", False),
     "dashboard": ("Tableau de bord", False),
     "users": ("Utilisateurs", False),
+    "billing": ("Abonnement", False),
 }
 
 

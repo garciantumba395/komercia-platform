@@ -16,6 +16,7 @@ services:
       KOMERSIA_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?définir DB_OWNER_PASSWORD dans .env}
       KOMERSIA_APP_PASSWORD: ${DB_PASSWORD:?définir DB_PASSWORD dans .env}
       KOMERSIA_BACKUP_PASSWORD: ${BACKUP_DB_PASSWORD:?définir BACKUP_DB_PASSWORD dans .env}
+      KOMERSIA_OPS_PASSWORD: ${DB_OPS_PASSWORD:?définir DB_OPS_PASSWORD dans .env}
     volumes:
       - db_data:/var/lib/postgresql/data
       # Initialisation au premier démarrage uniquement (volume vide) : rôles, base, privilèges.
@@ -62,6 +63,9 @@ services:
       DB_NAME: ${DB_NAME:-komersia}
       DB_USER: ${DB_USER:-komersia_app}
       DB_PASSWORD: ${DB_PASSWORD:?définir DB_PASSWORD dans .env}
+      # Console d'exploitation /ops/ : rôle BYPASSRLS à droits minimaux (alias de base `ops`).
+      DB_OPS_USER: ${DB_OPS_USER:-komersia_ops}
+      DB_OPS_PASSWORD: ${DB_OPS_PASSWORD:?définir DB_OPS_PASSWORD dans .env}
     ports:
       - "${WEB_PORT:-8000}:8000"
     depends_on:
