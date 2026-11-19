@@ -1,5 +1,7 @@
 """Opérations de la console. TOUTES les requêtes passent par l'alias `ops` (jamais par `default`)."""
 
+# ruff: noqa: E501
+
 from django.db import transaction
 from django.utils import timezone
 

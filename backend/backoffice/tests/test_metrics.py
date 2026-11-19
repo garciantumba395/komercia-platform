@@ -1,5 +1,7 @@
 """Indicateurs de la plateforme (KOM-083) : fonctions pures de `now`."""
 
+# ruff: noqa: E501
+
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 

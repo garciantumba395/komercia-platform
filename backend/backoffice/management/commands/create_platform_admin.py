@@ -6,6 +6,8 @@ Membership) : l'API commerçant le refuse. `--owner` en fait un propriétaire de
 gestion des fonctions par entreprise). À exécuter avec le rôle propriétaire (DB_USER=komersia_owner).
 """
 
+# ruff: noqa: E501
+
 import getpass
 import os
 

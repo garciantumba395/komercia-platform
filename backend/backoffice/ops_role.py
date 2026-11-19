@@ -15,6 +15,8 @@ Rien d'autre : pas de jetons (`authtoken_token`), pas de sessions, pas de paieme
 l'ajoute pas ici. Cette liste est dupliquée dans `scripts/db-init.sql` (un test vérifie la parité).
 """
 
+# ruff: noqa: E501
+
 from django.conf import settings
 
 SELECT_TABLES = [

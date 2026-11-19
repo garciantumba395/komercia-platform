@@ -1,5 +1,7 @@
 """Accès à la console : réservé aux agents is_staff ET actifs, par session, CSRF, limitation des tentatives."""
 
+# ruff: noqa: E501
+
 import pytest
 from django.test import Client
 

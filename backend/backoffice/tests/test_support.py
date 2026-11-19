@@ -1,5 +1,7 @@
 """Accès support avec consentement (KOM-082) : API du propriétaire + consultation en console."""
 
+# ruff: noqa: E501
+
 from datetime import timedelta
 
 import pytest

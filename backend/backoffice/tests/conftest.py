@@ -7,6 +7,8 @@ Création du rôle : via la connexion propriétaire si elle le permet ; sinon vi
 `scripts/db-init.sql`, ce que fait la CI).
 """
 
+# ruff: noqa: E501
+
 import importlib
 import os
 

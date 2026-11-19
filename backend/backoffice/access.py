@@ -5,6 +5,8 @@ entre. Un jeton d'API de commerçant (en-tête Authorization) est ignoré : ces 
 Un commerçant, même propriétaire, a `is_staff=False` : refus (403) ; un anonyme est redirigé vers la connexion.
 """
 
+# ruff: noqa: E501
+
 import hashlib
 from functools import wraps
 

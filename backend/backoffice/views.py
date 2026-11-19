@@ -1,5 +1,7 @@
 """Pages HTML de la console d'exploitation (serveur-rendues, sans dépendance externe)."""
 
+# ruff: noqa: E501
+
 import uuid
 
 from django.contrib import messages

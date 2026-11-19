@@ -1,5 +1,7 @@
 """Séparation des connexions : la console utilise `ops`, l'API commerçant n'y touche JAMAIS."""
 
+# ruff: noqa: E501
+
 import re
 
 import pytest

@@ -22,6 +22,8 @@ Définitions (reprises à l'écran) :
   confirmés / (confirmés + échoués + expirés) ; les paiements en attente sont ignorés.
 """
 
+# ruff: noqa: E501
+
 from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
 

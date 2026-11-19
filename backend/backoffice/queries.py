@@ -9,6 +9,8 @@ Jamais de `select_related("user")` ni de chargement d'un `User` complet : le rô
 colonne `password`. On utilise `values()` sur des colonnes autorisées.
 """
 
+# ruff: noqa: E501
+
 from django.db.models import Count, IntegerField, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone

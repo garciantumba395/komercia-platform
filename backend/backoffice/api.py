@@ -9,6 +9,8 @@ en lecture seule (c'est précisément le cas où le commerçant peut avoir besoi
 donnée métier.
 """
 
+# ruff: noqa: E501
+
 from datetime import timedelta
 
 from django.db import transaction

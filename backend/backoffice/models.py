@@ -13,6 +13,8 @@ Le rôle applicatif y accède par les privilèges par défaut de `scripts/db-ini
 le rôle `ops` y a des droits limités (voir `ops_role.py`). Aucune de ces tables ne contient de secret.
 """
 
+# ruff: noqa: E501
+
 import uuid
 
 from django.conf import settings

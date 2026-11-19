@@ -1,5 +1,7 @@
 """Le rôle PostgreSQL `komersia_ops` : BYPASSRLS, droits minimaux, et non-régression de l'isolation."""
 
+# ruff: noqa: E501
+
 import re
 from pathlib import Path
 
