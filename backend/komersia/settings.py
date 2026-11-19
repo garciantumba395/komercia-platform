@@ -92,7 +92,9 @@ DATABASES = {
 DATABASES["ops"] = {
     **DATABASES["default"],
     "USER": os.environ.get("DB_OPS_USER", "komersia_ops"),
-    "PASSWORD": os.environ.get("DB_OPS_PASSWORD", "ops"),
+    # Rôle BYPASSRLS : pas de mot de passe par défaut hors développement (la console reste inutilisable
+    # tant que DB_OPS_PASSWORD n'est pas défini).
+    "PASSWORD": os.environ.get("DB_OPS_PASSWORD", "ops" if DEBUG else ""),
     "ATOMIC_REQUESTS": False,
     "TEST": {"MIRROR": "default"},
 }
