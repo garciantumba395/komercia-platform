@@ -94,8 +94,10 @@
 
     /* ----- 2. Session de caisse ----- */
     /** Message d'abonnement terminé, adapté au rôle (seul le propriétaire peut s'abonner). */
-    const roText = () => (ctx.role === 'owner'
-      ? 'Abonnement terminé : l’encaissement est désactivé. Abonnez-vous pour reprendre les ventes.' : K.billing.INACTIVE_MESSAGE);
+    function roText() {
+      return ctx.role === 'owner'
+        ? 'Abonnement terminé : l’encaissement est désactivé. Abonnez-vous pour reprendre les ventes.' : K.billing.INACTIVE_MESSAGE;
+    }
 
     /** Abonnement en lecture seule : pas de nouvelle vente (le serveur la refuserait de toute façon, code 402). */
     function renderReadOnly() {
