@@ -2,7 +2,6 @@ from datetime import timedelta
 from decimal import Decimal
 
 import pytest
-from rest_framework.test import APIClient
 
 from audit.models import AuditEntry
 from billing import services
@@ -190,7 +189,6 @@ def test_downgrade_refused_when_limits_exceeded(tenant_a):
             services.change_plan(Subscription.objects.get(), plan_code="essentiel", currency="USD",
                                  phone="", now=NOW)
     assert exc.value.detail["code"] == "limits_exceeded"
-    assert "2 boutiques" not in exc.value.detail["detail"] or True
     assert "limité à 1" in exc.value.detail["detail"]
     assert get_sub(tenant_a).pending_plan is None
 
@@ -269,6 +267,3 @@ def test_check_limit(tenant_a):
         with pytest.raises(ValueError):
             check_limit(tenant_a.tenant, "widgets")
 
-
-def test_api_client_unused_import():
-    assert APIClient
