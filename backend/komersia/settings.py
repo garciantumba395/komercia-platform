@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "web",
     "sync",
     "billing",
+    "backoffice",
 ]
 
 MIDDLEWARE = [
@@ -83,6 +84,17 @@ DATABASES = {
         # `SET LOCAL app.tenant_id` (RLS) reste valable pendant toute la requête.
         "ATOMIC_REQUESTS": True,
     }
+}
+
+# Connexion RÉSERVÉE à la console d'exploitation de la plateforme (/ops/, personnel Komersia uniquement).
+# Rôle PostgreSQL `komersia_ops` : lit toutes les entreprises (BYPASSRLS), n'écrit presque rien.
+# Ne JAMAIS l'utiliser pour les requêtes des commerçants.
+DATABASES["ops"] = {
+    **DATABASES["default"],
+    "USER": os.environ.get("DB_OPS_USER", "komersia_ops"),
+    "PASSWORD": os.environ.get("DB_OPS_PASSWORD", "ops"),
+    "ATOMIC_REQUESTS": False,
+    "TEST": {"MIRROR": "default"},
 }
 
 AUTH_USER_MODEL = "accounts.User"
