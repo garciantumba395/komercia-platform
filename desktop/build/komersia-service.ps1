@@ -33,8 +33,8 @@ function Write-Step($msg) { Write-Host "[komersia] $msg" }
 
 function Invoke-Icacls {
     param([string[]]$IcaclsArgs)
-    $out = & icacls.exe @IcaclsArgs 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "icacls $($IcaclsArgs -join ' ') a échoué : $out" }
+    $out = & icacls.exe @IcaclsArgs
+    if ($LASTEXITCODE -ne 0) { throw "icacls $($IcaclsArgs -join ' ') a échoué ($LASTEXITCODE) : $out" }
 }
 
 function Get-SettingsPath { Join-Path (Join-Path $DataDir 'config') 'settings.json' }
@@ -71,21 +71,21 @@ function Install-Komersia {
     }
     $settings = Read-Settings
     $webPort = if ($settings.web_port) { [int]$settings.web_port } else { $Port }
-    $lan = ($settings.bind -ne '127.0.0.1')
+    $lanEnabled = ($settings.bind -ne '127.0.0.1')
 
     Write-Step 'Tâche planifiée « Komersia » (au démarrage de Windows, sans session ouverte)'
-    $action = New-ScheduledTaskAction -Execute $Exe -Argument '--run' -WorkingDirectory $InstallDir
-    $trigger = New-ScheduledTaskTrigger -AtStartup
-    $principal = New-ScheduledTaskPrincipal -UserId 'NT AUTHORITY\NETWORK SERVICE' -LogonType ServiceAccount `
+    $taskAction = New-ScheduledTaskAction -Execute $Exe -Argument '--run' -WorkingDirectory $InstallDir
+    $taskTrigger = New-ScheduledTaskTrigger -AtStartup
+    $taskPrincipal = New-ScheduledTaskPrincipal -UserId 'NT AUTHORITY\NETWORK SERVICE' -LogonType ServiceAccount `
         -RunLevel Limited
     $taskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
         -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) `
         -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1)
-    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal `
+    Register-ScheduledTask -TaskName $TaskName -Action $taskAction -Trigger $taskTrigger -Principal $taskPrincipal `
         -Settings $taskSettings -Description 'Serveur Komersia (base de données et application web).' -Force | Out-Null
 
     Remove-NetFirewallRule -DisplayName $FirewallRule -ErrorAction SilentlyContinue
-    if ($lan) {
+    if ($lanEnabled) {
         Write-Step "Pare-feu : entrée autorisée sur le réseau PRIVÉ, ports $webPort-$($webPort + 9)"
         New-NetFirewallRule -DisplayName $FirewallRule -Direction Inbound -Action Allow -Protocol TCP `
             -LocalPort "$webPort-$($webPort + 9)" -Profile Private -Program $Exe `
