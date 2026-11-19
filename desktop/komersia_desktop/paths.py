@@ -91,7 +91,9 @@ class Paths:
 
     @property
     def lock_file(self) -> Path:
-        return self.data_dir / "komersia.lock"
+        # Dans `control/` (modifiable par tous les comptes locaux) : n'importe quel utilisateur doit pouvoir
+        # tester le verrou pour --status / --stop / --open, sans pouvoir lire les secrets.
+        return self.control_dir / "komersia.lock"
 
     @property
     def control_dir(self) -> Path:

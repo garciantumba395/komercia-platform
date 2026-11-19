@@ -35,6 +35,13 @@ pytestmark = [
 PHONE, PASSWORD = "+243990000123", "Motdepasse!2026x"
 
 
+FROZEN = os.environ.get("KOMERSIA_TEST_FROZEN")  # exécutable PyInstaller (Linux) à tester au lieu des sources
+
+
+def launcher() -> list[str]:
+    return [FROZEN] if FROZEN else [sys.executable, "-m", "komersia_desktop.main"]
+
+
 class Instance:
     def __init__(self, base: Path):
         self.data = base / "data"
@@ -52,11 +59,11 @@ class Instance:
         return env
 
     def cli(self, *args, **extra) -> subprocess.CompletedProcess:
-        return subprocess.run([sys.executable, "-m", "komersia_desktop.main", *args], env=self.env(**extra),
+        return subprocess.run([*launcher(), *args], env=self.env(**extra),
                               cwd=DESKTOP, capture_output=True, text=True, timeout=120)
 
     def start(self, **extra):
-        self.proc = subprocess.Popen([sys.executable, "-m", "komersia_desktop.main", "--run"],
+        self.proc = subprocess.Popen([*launcher(), "--run"],
                                      env=self.env(**extra), cwd=DESKTOP, stdout=subprocess.PIPE,
                                      stderr=subprocess.STDOUT, text=True)
 

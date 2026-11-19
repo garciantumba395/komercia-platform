@@ -176,7 +176,7 @@ def test_filters(tenant_a):
     assert ids(entity_id="p1") == {str(e2.pk)}
     assert ids(user=str(tenant_a.user.id)) == {str(e1.pk)}
     assert ids(user=str(other)) == set()
-    today = timezone.now().date()
+    today = timezone.localdate()  # le filtre raisonne en heure locale (Africa/Kinshasa), pas en UTC
     assert ids(date_from=today.isoformat(), date_to=today.isoformat()) == {str(e1.pk), str(e2.pk)}
     tomorrow = today + datetime.timedelta(days=1)
     assert ids(date_from=tomorrow.isoformat()) == set()

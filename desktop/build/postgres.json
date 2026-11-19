@@ -1,0 +1,5 @@
+{
+  "_commentaire": "PostgreSQL portable (zip des binaires EDB, Windows x64). Pour changer de version : modifier 'version' puis lancer le workflow « Installateur Windows » avec l'option 'afficher la somme SHA-256' ; copier la somme affichée dans 'sha256'. La construction ÉCHOUE tant que 'sha256' est vide.",
+  "version": "16.4-1",
+  "sha256": ""
+}

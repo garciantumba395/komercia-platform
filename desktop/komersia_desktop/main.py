@@ -34,6 +34,9 @@ from .server import WebServer
 
 log = logging.getLogger("komersia")
 
+# Le pare-feu autorise la plage [port, port + 9] : le repli ne doit pas en sortir.
+WEB_PORT_ATTEMPTS = 10
+
 EXIT_OK, EXIT_ERROR, EXIT_ALREADY_RUNNING, EXIT_NOT_RUNNING, EXIT_STARTING = 0, 1, 2, 3, 4
 
 
@@ -120,7 +123,7 @@ class KomersiaServer:
             if prepared.first_run:
                 log.info("Premier lancement : secrets générés, création de la base (environ une minute)")
             pg, pg_port = self._bring_up_database(prepared, stop_after=False)
-            web_port = choose_port(st.web_port, st.bind)
+            web_port = choose_port(st.web_port, st.bind, attempts=WEB_PORT_ATTEMPTS)
             if web_port != st.web_port:
                 log.warning("Port web %s occupé : utilisation de %s", st.web_port, web_port)
             os.environ.update(setup.django_env(paths, role="app", pg_port=pg_port))
@@ -312,6 +315,12 @@ def selftest() -> int:
     for must in ("accounts", "sales", "catalog"):
         if must not in migrated:
             problems.append(f"migrations introuvables : {must}")
+    from django.core.management import get_commands
+
+    commands = get_commands()  # découverte des commandes : piège classique des applications gelées
+    for must in ("migrate", "collectstatic", "billing_tick"):
+        if must not in commands:
+            problems.append(f"commande de gestion introuvable : {must}")
     import cryptography  # noqa: F401
     import psycopg  # noqa: F401
     import waitress  # noqa: F401

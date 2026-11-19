@@ -1,0 +1,12 @@
+﻿KOMERSIA - gestion commerciale pour boutiques
+
+Komersia fonctionne sur CE PC (le PC principal de la boutique). Les autres PC et téléphones du même
+réseau s'y connectent avec un navigateur.
+
+* Ouvrir Komersia : raccourci « Komersia » (Bureau ou menu Démarrer).
+* Adresse pour les autres appareils : raccourci « Adresse pour les autres appareils ».
+* Arrêter Komersia : raccourci « Arrêter Komersia » (à faire avant d'éteindre le PC si possible).
+* Vos données sont dans C:\ProgramData\Komersia (elles sont conservées si vous désinstallez ou mettez à jour).
+
+Komersia démarre automatiquement avec Windows, même si personne n'ouvre de session.
+Le PC principal doit rester allumé pendant les heures d'ouverture.

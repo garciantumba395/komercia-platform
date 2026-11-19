@@ -62,7 +62,7 @@ def _atomic_write(path: Path, text: str, *, private: bool) -> None:
 
 def load_secrets(paths: Paths) -> Secrets | None:
     try:
-        raw = json.loads(paths.secrets_file.read_text(encoding="utf-8"))
+        raw = json.loads(paths.secrets_file.read_text(encoding="utf-8-sig"))
         return Secrets(**{k: raw[k] for k in Secrets.__dataclass_fields__})
     except FileNotFoundError:
         return None
@@ -106,7 +106,7 @@ def load_settings(paths: Paths, env: Mapping[str, str] | None = None) -> Setting
     env = os.environ if env is None else env
     s = Settings()
     try:
-        raw = json.loads(paths.settings_file.read_text(encoding="utf-8"))
+        raw = json.loads(paths.settings_file.read_text(encoding="utf-8-sig"))
     except (FileNotFoundError, ValueError):
         raw = {}
     for key in ("web_port", "pg_port", "threads"):
@@ -154,14 +154,14 @@ def write_runtime(paths: Paths, rt: Runtime) -> None:
 
 def read_runtime(paths: Paths) -> Runtime | None:
     try:
-        return Runtime(**json.loads(paths.runtime_file.read_text(encoding="utf-8")))
+        return Runtime(**json.loads(paths.runtime_file.read_text(encoding="utf-8-sig")))
     except (OSError, ValueError, TypeError):
         return None
 
 
 def read_state(paths: Paths) -> dict:
     try:
-        data = json.loads(paths.state_file.read_text(encoding="utf-8"))
+        data = json.loads(paths.state_file.read_text(encoding="utf-8-sig"))
         return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
         return {}
