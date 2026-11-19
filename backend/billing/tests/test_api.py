@@ -113,7 +113,8 @@ def test_change_plan_api_upgrade_and_downgrade(tenant_a):
     sandbox_confirm(r.json()["payment"]["reference"])
     assert client.get(f"{B}/subscription/").json()["plan"] == "pro"
     r = client.post(f"{B}/change-plan/", {"plan": "essentiel"}, format="json")
-    assert r.status_code == 200 and r.json()["kind"] == "downgrade" and r.json()["pending_plan"] == "essentiel"
+    assert r.status_code == 200 and r.json()["kind"] == "downgrade"
+    assert r.json()["pending_plan"] == "essentiel"
     assert client.get(f"{B}/subscription/").json()["pending_plan"] == "essentiel"
     add_stores(tenant_a, 1)
     r = client.post(f"{B}/change-plan/", {"plan": "essentiel"}, format="json")
@@ -265,7 +266,8 @@ def test_isolation_between_tenants(tenant_a, tenant_b):
         assert Subscription.objects.get().tenant_id == tenant_b.tenant.id
         assert SubscriptionPayment.objects.count() == 0
     # Un webhook ne confirme que le paiement de SA référence
-    ref_b = cb.post(f"{B}/subscribe/", {**SUBSCRIBE, "plan": "essentiel"}, format="json").json()["payment"]["reference"]
+    ref_b = cb.post(f"{B}/subscribe/", {**SUBSCRIBE, "plan": "essentiel"}, format="json").json()["payment"][
+        "reference"]
     assert post_webhook(ref_b, "confirmed").status_code == 200
     assert get_sub(tenant_b).state == "active" and get_sub(tenant_b).plan.code == "essentiel"
     assert get_sub(tenant_a).state == "trial"
@@ -294,7 +296,8 @@ def test_payment_reference_has_no_rls_and_leaks_nothing(tenant_a, tenant_b):
 
 def test_audit_actions(tenant_a):
     client = tenant_a.client()
-    ref = client.post(f"{B}/subscribe/", {**SUBSCRIBE, "plan": "essentiel"}, format="json").json()["payment"]["reference"]
+    ref = client.post(f"{B}/subscribe/", {**SUBSCRIBE, "plan": "essentiel"}, format="json").json()["payment"][
+        "reference"]
     sandbox_confirm(ref)
     r = client.post(f"{B}/change-plan/", {"plan": "pro"}, format="json")
     sandbox_confirm(r.json()["payment"]["reference"])

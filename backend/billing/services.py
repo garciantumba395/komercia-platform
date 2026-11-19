@@ -219,7 +219,7 @@ def check_limit(tenant, resource: str) -> None:
 
 def _assert_plan_fits(plan: Plan, tenant_id) -> None:
     used = usage(tenant_id)
-    for resource, (singular, plural) in _RESOURCE_LABELS.items():
+    for resource, (_singular, plural) in _RESOURCE_LABELS.items():
         limit = getattr(plan, f"max_{resource}")
         if used[resource] > limit:
             raise BillingError(

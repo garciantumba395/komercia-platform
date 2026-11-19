@@ -25,10 +25,12 @@ def test_trial_created_on_registration(tenant_a):
 
 def test_initial_plans_seeded(db):
     plans = {p.code: p for p in Plan.objects.all()}
-    assert (plans["essentiel"].price_usd_minor, plans["essentiel"].max_stores, plans["essentiel"].max_users) == (500, 1, 3)
-    assert (plans["pro"].price_usd_minor, plans["pro"].max_stores, plans["pro"].max_users) == (1500, 3, 10)
-    b = plans["business"]
-    assert (b.price_usd_minor, b.max_stores, b.max_users, b.extra_store_price_usd_minor) == (4000, 10, 50, 1000)
+    def spec(p):
+        return (p.price_usd_minor, p.max_stores, p.max_users, p.extra_store_price_usd_minor)
+
+    assert spec(plans["essentiel"]) == (500, 1, 3, 0)
+    assert spec(plans["pro"]) == (1500, 3, 10, 0)
+    assert spec(plans["business"]) == (4000, 10, 50, 1000)
 
 
 def test_trial_to_read_only(tenant_a):
