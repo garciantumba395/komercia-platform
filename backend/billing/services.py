@@ -21,6 +21,7 @@ from core.tenancy import get_current_tenant_id, tenant_context
 from currency.money import convert_minor
 from currency.services import current_rate
 
+from . import clock
 from .models import (
     BillingNotice,
     PaymentReference,
@@ -71,7 +72,19 @@ def add_months(value: datetime, months: int) -> datetime:
 
 
 def _now(now):
-    return now or timezone.now()
+    """`now` explicite (tests, rattrapage) ou temps d'abonnement qui ne recule jamais (billing.clock)."""
+    return now or clock.effective_now()
+
+
+def payments_enabled() -> bool:
+    """Paiement en ligne (Mobile Money) disponible : un fournisseur est configuré."""
+    return bool(provider_code())
+
+
+def require_payments() -> None:
+    if not payments_enabled():
+        raise BillingError("Le paiement en ligne n'est pas disponible. Activez une clé de licence.",
+                           "payments_disabled")
 
 
 def _days_between(end: datetime, now: datetime) -> int:
@@ -378,6 +391,36 @@ def _apply_plan(sub: Subscription, plan: Plan, user, reason="Passage au plan sup
               after={"plan_id": plan.id}, user=user, reason=reason)
 
 
+def extend_subscription(sub: Subscription, plan: Plan, months: int, now: datetime):
+    """Active l'abonnement sur `plan` et prolonge de `months` mois calendaires à partir de
+    max(maintenant, fin de période encore valide) : payer en avance ne fait pas perdre de jours.
+
+    Commun aux paiements confirmés et aux clés de licence. Retourne (début, fin) de la période ajoutée.
+    """
+    first = sub.plan_id is None
+    old_plan_id = sub.plan_id
+    start = now
+    if sub.state == Subscription.ACTIVE and sub.current_period_end and sub.current_period_end > now:
+        start = sub.current_period_end  # paiement anticipé : aucun jour perdu
+    end = add_months(start, months)
+    before = {f: getattr(sub, f) for f in (*_STATE_FIELDS, "current_period_end")}
+    sub.state = Subscription.ACTIVE
+    sub.plan, sub.pending_plan = plan, None
+    sub.current_period_start, sub.current_period_end = start, end
+    sub.grace_ends_at = sub.read_only_since = None
+    sub.cancel_at_period_end, sub.canceled_at = False, None
+    sub.save()
+    if first:
+        audit.log("subscription.start", "subscription", sub.id, before=before,
+                  after={"plan_id": plan.id, "current_period_end": end}, user=None,
+                  reason="Première souscription")
+    elif old_plan_id != plan.id:
+        audit.log("subscription.plan_change", "subscription", sub.id,
+                  before={"plan_id": old_plan_id}, after={"plan_id": plan.id},
+                  user=None, reason="Changement de plan au renouvellement")
+    return start, end
+
+
 @transaction.atomic
 def confirm_payment(reference: str, now=None) -> tuple[SubscriptionPayment, bool]:
     """Confirme un paiement (idempotent). Retourne (paiement, a_change).
@@ -392,31 +435,11 @@ def confirm_payment(reference: str, now=None) -> tuple[SubscriptionPayment, bool
     if payment.status in (SubscriptionPayment.CONFIRMED, SubscriptionPayment.FAILED):
         return payment, False
 
-    first = sub.plan_id is None
-    old_plan_id = sub.plan_id
     if payment.kind == SubscriptionPayment.KIND_UPGRADE:
         _apply_plan(sub, payment.plan, None)
         start, end = sub.current_period_start, sub.current_period_end
     else:
-        start = now
-        if sub.state == Subscription.ACTIVE and sub.current_period_end and sub.current_period_end > now:
-            start = sub.current_period_end  # paiement anticipé : aucun jour perdu
-        end = add_months(start, 1)
-        before = {f: getattr(sub, f) for f in (*_STATE_FIELDS, "current_period_end")}
-        sub.state = Subscription.ACTIVE
-        sub.plan, sub.pending_plan = payment.plan, None
-        sub.current_period_start, sub.current_period_end = start, end
-        sub.grace_ends_at = sub.read_only_since = None
-        sub.cancel_at_period_end, sub.canceled_at = False, None
-        sub.save()
-        if first:
-            audit.log("subscription.start", "subscription", sub.id, before=before,
-                      after={"plan_id": payment.plan_id, "current_period_end": end}, user=None,
-                      reason="Première souscription")
-        elif old_plan_id != payment.plan_id:
-            audit.log("subscription.plan_change", "subscription", sub.id,
-                      before={"plan_id": old_plan_id}, after={"plan_id": payment.plan_id},
-                      user=None, reason="Changement de plan au renouvellement")
+        start, end = extend_subscription(sub, payment.plan, 1, now)
     payment.status = SubscriptionPayment.CONFIRMED
     payment.confirmed_at, payment.period_start, payment.period_end = now, start, end
     payment.save(update_fields=["status", "confirmed_at", "period_start", "period_end", "updated_at"])
@@ -504,6 +527,12 @@ def next_action(sub: Subscription, now: datetime) -> str | None:
     return None
 
 
+def licensing_enabled() -> bool:
+    from . import licensing
+
+    return licensing.license_enabled()
+
+
 def summary(sub: Subscription, now=None) -> dict:
     """Représentation de l'abonnement pour l'API (état calculé à `now`, sans écriture)."""
     now = _now(now)
@@ -531,6 +560,8 @@ def summary(sub: Subscription, now=None) -> dict:
             "users_used": used["users"],
         },
         "next_action": next_action(sub, now),
+        "payments_enabled": payments_enabled(),
+        "license_enabled": licensing_enabled(),
     }
 
 
@@ -569,6 +600,8 @@ def tick(now=None) -> dict:
     """Applique les transitions et génère les rappels pour tous les abonnements (idempotent)."""
     from accounts.models import Tenant
 
+    if now is None:
+        clock.touch()
     now = _now(now)
     stats = {"subscriptions": 0, "state_changes": 0, "notices": 0, "expired_payments": 0}
     for tenant_id in list(Tenant.objects.filter(is_active=True).values_list("id", flat=True)):

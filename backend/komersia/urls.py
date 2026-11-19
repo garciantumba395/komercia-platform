@@ -23,6 +23,7 @@ urlpatterns = [
     path("api/v1/audit/", include("audit.urls")),
     path("api/v1/sync/", include("sync.urls")),
     path("api/v1/billing/", include("billing.urls")),
+    path("api/v1/backups/", include("backups.urls")),
     path("api/v1/support/", include("backoffice.api_urls")),
     path("ops/", include("backoffice.urls")),
     path("app/", include("web.urls")),

@@ -15,6 +15,17 @@ def _date(value) -> str:
 
 
 def receipt_lines(payment, business_name: str) -> list[tuple[str, str]]:
+    if payment.provider == "license":
+        return [
+            ("Reçu d'abonnement n°", payment.reference),
+            ("Entreprise", business_name),
+            ("Plan", payment.plan.name),
+            ("Date d'activation", _date(payment.confirmed_at)),
+            ("Durée", f"{payment.months} mois"),
+            ("Période couverte", f"du {_date(payment.period_start)} au {_date(payment.period_end)}"),
+            ("Mode de paiement", "Clé de licence (payée hors application)"),
+            ("Statut", "Payé"),
+        ]
     rows = [
         ("Reçu d'abonnement n°", payment.reference),
         ("Entreprise", business_name),

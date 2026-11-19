@@ -5,6 +5,8 @@ from . import views
 urlpatterns = [
     path("plans/", views.PlanListView.as_view()),
     path("subscription/", views.SubscriptionView.as_view()),
+    path("installation/", views.InstallationView.as_view()),
+    path("license/activate/", views.LicenseActivateView.as_view()),
     path("subscribe/", views.SubscribeView.as_view()),
     path("payments/", views.PaymentListView.as_view()),
     path("payments/<uuid:pk>/receipt/", views.PaymentReceiptView.as_view()),

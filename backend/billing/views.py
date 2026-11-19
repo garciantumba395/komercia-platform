@@ -14,11 +14,12 @@ from rest_framework.views import APIView
 from core.permissions import ACCOUNTANT, MANAGER, OWNER, HasRole
 from currency.services import current_rate
 
-from . import receipts, services
+from . import licensing, receipts, services
 from .models import BillingNotice, Plan, SubscriptionPayment
 from .providers import get_provider, provider_code
 from .serializers import (
     ChangePlanSerializer,
+    LicenseActivateSerializer,
     NoticeSerializer,
     PaymentBriefSerializer,
     PaymentSerializer,
@@ -59,6 +60,7 @@ class SubscribeView(APIView):
     allowed_roles = WRITE_ROLES
 
     def post(self, request):
+        services.require_payments()
         data = SubscribeSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         sub = _subscription(request)
@@ -67,6 +69,27 @@ class SubscribeView(APIView):
             phone=data.validated_data["phone"])
         return Response({"payment": PaymentBriefSerializer(payment).data,
                          "instructions": instructions}, status=201)
+
+
+class InstallationView(APIView):
+    """Identifiant de CETTE installation, à communiquer à l'agent pour obtenir une clé de licence."""
+
+    permission_classes = [HasRole]
+    allowed_roles = READ_ROLES
+
+    def get(self, request):
+        return Response(licensing.installation_info())
+
+
+class LicenseActivateView(APIView):
+    permission_classes = [HasRole]
+    allowed_roles = WRITE_ROLES
+
+    def post(self, request):
+        data = LicenseActivateSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        sub = licensing.activate(_subscription(request), data.validated_data["key"], user=request.user)
+        return Response(services.summary(sub))
 
 
 class PaymentListView(ListAPIView):
@@ -112,6 +135,7 @@ class ChangePlanView(APIView):
     allowed_roles = WRITE_ROLES
 
     def post(self, request):
+        services.require_payments()
         data = ChangePlanSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         sub = _subscription(request)

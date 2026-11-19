@@ -13,6 +13,7 @@ PAGES = {
     "dashboard": ("Tableau de bord", False),
     "users": ("Utilisateurs", False),
     "billing": ("Abonnement", False),
+    "backups": ("Sauvegardes", False),
 }
 
 

@@ -102,6 +102,7 @@ class SubscriptionPayment(TenantOwnedModel):
     period_end = models.DateTimeField(null=True, blank=True)
     phone = models.CharField(max_length=20, blank=True)
     confirmed_at = models.DateTimeField(null=True, blank=True)
+    months = models.PositiveSmallIntegerField(default=1)  # durée couverte (clé de licence : 1 à 12)
 
     objects = _PaymentQuerySet.as_manager()
 
@@ -133,6 +134,37 @@ class PaymentReference(models.Model):
 
     def __str__(self):
         return self.reference
+
+
+class LicenseState(models.Model):
+    """État de licence de L'INSTALLATION : une seule ligne (id = 1), SANS RLS, jamais modifiable via l'API.
+
+    `installation_id` identifie ce PC (les clés de licence y sont liées) ; `last_seen_at` est la dernière date
+    vue, qui empêche de reculer l'horloge pour prolonger un essai ou un abonnement.
+    """
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1)
+    installation_id = models.UUIDField(default=uuid.uuid4, editable=False)
+    last_seen_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [models.CheckConstraint(condition=models.Q(id=1), name="licensestate_singleton")]
+
+    def __str__(self):
+        return f"installation {self.installation_id}"
+
+
+class LicenseKeyUse(models.Model):
+    """Clé de licence déjà utilisée (SANS RLS) : le nonce est unique, une clé ne sert qu'une fois."""
+
+    nonce = models.CharField(max_length=64, unique=True)
+    tenant_id = models.UUIDField()
+    plan_code = models.CharField(max_length=30)
+    months = models.PositiveSmallIntegerField()
+    used_at = models.DateTimeField()
+
+    def __str__(self):
+        return self.nonce
 
 
 class BillingNotice(TenantOwnedModel):

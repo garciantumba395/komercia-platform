@@ -13,7 +13,7 @@ class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubscriptionPayment
         fields = ["id", "reference", "plan", "kind", "amount_minor", "currency", "amount_usd_minor",
-                  "rate_cdf_per_usd", "provider", "status", "period_start", "period_end", "phone",
+                  "rate_cdf_per_usd", "provider", "months", "status", "period_start", "period_end", "phone",
                   "created_at", "confirmed_at"]
         read_only_fields = fields
 
@@ -80,3 +80,7 @@ class ChangePlanSerializer(serializers.Serializer):
 class ProviderResultSerializer(serializers.Serializer):
     reference = serializers.CharField()
     status = serializers.ChoiceField(choices=["confirmed", "failed"])
+
+
+class LicenseActivateSerializer(serializers.Serializer):
+    key = serializers.CharField(max_length=1000, trim_whitespace=True)

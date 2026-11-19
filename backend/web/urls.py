@@ -24,4 +24,5 @@ urlpatterns = [
     path("tableau-de-bord/", views.page("dashboard"), name="dashboard"),
     path("utilisateurs/", views.page("users"), name="users"),
     path("abonnement/", views.page("billing"), name="billing"),
+    path("sauvegardes/", views.page("backups"), name="backups"),
 ]

@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "sync",
     "billing",
     "backoffice",
+    "backups",
 ]
 
 MIDDLEWARE = [

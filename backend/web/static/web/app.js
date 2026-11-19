@@ -29,6 +29,7 @@
     { id: 'rates', href: '/app/taux/', label: 'Taux de change', icon: '💱', roles: ['owner', 'manager', 'accountant'] },
     { id: 'users', href: '/app/utilisateurs/', label: 'Utilisateurs', icon: '🔑', roles: ['owner'] },
     { id: 'billing', href: '/app/abonnement/', label: 'Abonnement', icon: '💳', roles: ['owner', 'manager', 'accountant'] },
+    { id: 'backups', href: '/app/sauvegardes/', label: 'Sauvegardes', icon: '💾', roles: ['owner', 'manager'], optional: true },
   ];
   K.ROLE_LABELS = ROLE_LABELS;
   const canOpen = (id, role) => NAV.some((n) => n.id === id && n.roles.includes(role));
@@ -184,6 +185,72 @@
     READERS: BILLING_READERS, PAYMENT_KINDS, STATE_LABELS, NOTICE_TEXTS, INACTIVE_MESSAGE,
     daysLabel, bannerFor, paymentStatus, paymentStatusLabel, isReadOnly,
     canRead: (role) => BILLING_READERS.includes(role),
+  };
+
+  /* ---------- Sauvegardes locales : logique pure (libellés, bandeau, alerte) ---------- */
+  const hmFormat = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Kinshasa' });
+  const BACKUP_STATUS = { ok: ['Réussie', 'ok'], echec: ['Échec', 'danger'], dossier_introuvable: ['Dossier introuvable', 'warn'] };
+  const BACKUP_REASON = { scheduled: 'Automatique', manual: 'Manuelle', pre_restore: 'Avant restauration' };
+  const FOLDER_STATE = {
+    ok: 'Dossier disponible', unset: 'Aucun dossier choisi', missing: 'Dossier introuvable (clé USB débranchée ?)',
+    not_writable: 'Dossier en lecture seule ou plein',
+  };
+  const dayDiff = (iso, now) => {
+    const a = dayOf(now || new Date().toISOString()); const b = dayOf(iso);
+    return Math.round((Date.parse(a + 'T00:00:00Z') - Date.parse(b + 'T00:00:00Z')) / 86400000);
+  };
+  /** « aujourd’hui à 02:00 », « hier à 02:00 », « demain à 02:00 », « le 17/11/2026 à 02:00 ». */
+  function backupWhen(iso, now) {
+    if (!iso || Number.isNaN(Date.parse(iso))) return '';
+    const hm = hmFormat.format(new Date(iso));
+    const diff = dayDiff(iso, now);
+    if (diff === 0) return 'aujourd’hui à ' + hm;
+    if (diff === 1) return 'hier à ' + hm;
+    if (diff === -1) return 'demain à ' + hm;
+    return 'le ' + fmtDate(iso) + ' à ' + hm;
+  }
+  function backupAge(hours) {
+    if (hours === null || hours === undefined) return '';
+    if (hours < 1) return 'moins d’une heure';
+    if (hours < 48) return Math.floor(hours) + (Math.floor(hours) === 1 ? ' heure' : ' heures');
+    return Math.floor(hours / 24) + ' jours';
+  }
+  function backupSize(bytes) {
+    const n = Number(bytes) || 0;
+    if (n < 1024) return n + ' o';
+    const units = ['Ko', 'Mo', 'Go', 'To'];
+    let v = n / 1024; let i = 0;
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i += 1; }
+    return v.toLocaleString('fr-FR', { maximumFractionDigits: v < 10 ? 1 : 0 }) + NBSP + units[i];
+  }
+  /** Grand état de la page : { tone: ok|warn|danger, title, text }. La santé (health) vient du serveur. */
+  function backupSummary(st, now) {
+    if (!st) return null;
+    const tone = { ok: 'ok', late: 'warn', alert: 'danger' }[st.health] || 'warn';
+    const attempt = st.last_attempt;
+    const failedLast = !!attempt && attempt.status === 'echec' && (!st.last_success || Date.parse(attempt.created_at) > Date.parse(st.last_success.created_at));
+    if (!st.last_success) {
+      return { tone, title: 'Aucune sauvegarde pour le moment',
+        text: failedLast ? 'La dernière tentative a échoué : ' + attempt.message : 'Vos données ne sont pas encore protégées. Cliquez sur « Sauvegarder maintenant ».' };
+    }
+    const suffix = failedLast ? 'dernière tentative en échec' : tone === 'ok' ? 'OK' : tone === 'warn' ? 'un peu ancienne' : 'trop ancienne (' + backupAge(st.age_hours) + ')';
+    return { tone, title: 'Dernière sauvegarde : ' + backupWhen(st.last_success.created_at, now) + ' — ' + suffix,
+      text: failedLast ? 'La dernière tentative a échoué : ' + attempt.message : '' };
+  }
+  /** Bandeau global (toutes les pages) : seulement si la dernière sauvegarde réussie a plus de 2 jours, ou n'existe pas. */
+  function backupBannerFor(st) {
+    if (!st || !st.banner) return null;
+    const text = st.last_success
+      ? 'Vos données ne sont plus sauvegardées : la dernière sauvegarde date de ' + backupAge(st.age_hours) + '.'
+      : 'Vos données ne sont pas encore sauvegardées.';
+    return { tone: 'warn', text, action: { label: 'Voir les sauvegardes', href: '/app/sauvegardes/' } };
+  }
+  K.backups = {
+    ROLES: ['owner', 'manager'], canUse: (role) => ['owner', 'manager'].includes(role), canConfigure: (role) => role === 'owner',
+    when: backupWhen, age: backupAge, size: backupSize, summary: backupSummary, bannerFor: backupBannerFor,
+    statusLabel: (s) => (BACKUP_STATUS[s] || [String(s || ''), 'muted'])[0],
+    statusTone: (s) => (BACKUP_STATUS[s] || [String(s || ''), 'muted'])[1],
+    reasonLabel: (r) => BACKUP_REASON[r] || String(r || ''), folderLabel: (s) => FOLDER_STATE[s] || String(s || ''),
   };
 
   /* ---------- DOM ---------- */
@@ -457,7 +524,8 @@
     NAV.filter((n) => n.roles.includes(role)).forEach((n) => {
       const a = h('a', { href: n.href }, h('span', { 'aria-hidden': 'true' }, n.icon), n.label);
       if (n.id === page) a.setAttribute('aria-current', 'page');
-      list.appendChild(h('li', null, a));
+      // entrée facultative : cachée tant que l'API du module ne répond pas (ex. sauvegardes : édition locale)
+      list.appendChild(h('li', { id: 'nav-' + n.id, hidden: !!n.optional }, a));
     });
     const toggle = document.getElementById('menu-toggle');
     const setOpen = (open) => {
@@ -535,6 +603,34 @@
     }
   };
 
+  /** Sauvegardes locales (propriétaire et gérant) : l'entrée de menu n'apparaît que si l'API répond (édition
+   *  locale) ; bandeau d'avertissement sur toutes les pages sauf la page Sauvegardes (qui a son propre état). */
+  async function refreshBackups() {
+    const ctx = K.ctx;
+    ctx.backups = null;
+    if (!K.backups.canUse(ctx.role)) return null;
+    try {
+      ctx.backups = await api('backups/status/');
+    } catch (e) {
+      ctx.backups = null; // édition en ligne (404) ou module absent : aucune entrée, aucun bandeau
+    }
+    const item = document.getElementById('nav-backups');
+    if (item) item.hidden = !ctx.backups;
+    const slot = document.getElementById('backup-banner');
+    if (slot) {
+      clear(slot);
+      const b = document.body.dataset.page === 'backups' ? null : K.backups.bannerFor(ctx.backups);
+      slot.hidden = !b;
+      if (b) {
+        slot.className = 'sub-banner tone-' + b.tone;
+        slot.append(h('span', { class: 'sub-banner-text' }, b.text),
+          h('a', { class: 'btn btn-small sub-banner-btn', href: b.action.href }, b.action.label));
+      }
+    }
+    return ctx.backups;
+  }
+  K.refreshBackups = refreshBackups;
+
   function showWelcome() {
     const area = document.getElementById('sub-area');
     if (!area || !store.get('kom_welcome')) return;
@@ -591,7 +687,7 @@
     } else if (ctx.store) {
       slot.appendChild(h('span', { class: 'chip' }, ctx.store.name));
     }
-    await Promise.all([loadRate(ctx), refreshSubscription()]);
+    await Promise.all([loadRate(ctx), refreshSubscription(), refreshBackups()]);
     showWelcome();
 
     const render = K.pages[page];

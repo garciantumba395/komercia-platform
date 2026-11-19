@@ -125,3 +125,54 @@ def test_billing_roles():
     roles = ("owner", "manager", "accountant", "cashier", "storekeeper")
     got = run([["billing.canRead", [r]] for r in roles])
     assert got == [True, True, True, False, False]
+
+
+# --- Édition locale : activation par clé de licence (sans paiement en ligne) ---
+
+KEY_HARNESS = """
+const vm = require('vm'), fs = require('fs');
+const noop = () => {};
+const win = { localStorage: {}, location: { search: '', replace: noop },
+  matchMedia: () => ({ matches: false }) };
+const doc = { addEventListener: noop, body: { dataset: {} }, getElementById: () => null,
+  createElement: () => ({ appendChild: noop, setAttribute: noop, addEventListener: noop }),
+  createTextNode: (t) => t };
+const ctx = vm.createContext({ window: win, document: doc, URLSearchParams, Intl, BigInt, console,
+  setTimeout, clearTimeout });
+for (const f of process.argv.slice(1, 3)) vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
+const L = win.Komersia.licenseKey;
+console.log(JSON.stringify(JSON.parse(process.argv[3]).map(([fn, a]) => L[fn](a))));
+"""
+
+
+def run_key(calls):
+    import json
+    import subprocess
+
+    args = [NODE, "-e", KEY_HARNESS, str(STATIC / "app.js"), str(STATIC / "billing.js"), json.dumps(calls)]
+    done = subprocess.run(args, capture_output=True, text=True, timeout=30, check=True)
+    return json.loads(done.stdout)
+
+
+@needs_node
+def test_license_key_input_is_normalised_and_grouped():
+    got = run_key([
+        ["format", "abcde fghij-klmno 23"], ["format", ""], ["format", "  ab c "], ["normalize", "ab-cd ef"],
+        ["format", "ABCDEFGHIJ"],
+    ])
+    assert got == ["ABCDE-FGHIJ-KLMNO-23", "", "ABC", "ABCDEF", "ABCDE-FGHIJ"]
+
+
+def test_billing_page_hides_online_payment_and_shows_licence_card_when_payments_disabled():
+    js = (STATIC / "billing.js").read_text(encoding="utf-8")
+    assert "payments_enabled === false" in js
+    for text in ("Activer ou renouveler votre abonnement", "Copier", "Activer", "billing/license/activate/",
+                 "billing/installation/",
+                 "Donnez ce code à votre agent Komersia et payez-lui votre abonnement",
+                 "Il vous remet une clé de licence", "Saisissez-la ici", "/app/abonnement/#licence"):
+        assert text in js, text
+    # le paiement Mobile Money, le choix de devise, le téléphone et le mode test ne sont montrés que si le
+    # paiement en ligne est actif : renderPay s'arrête en mode licence, la sonde du bac à sable aussi
+    assert "if (licenseMode() || !owner || !S.plan || waitingBlocks()) return;" in js
+    assert "if (owner && !licenseMode()) {" in js
+    assert "if (owner && !indicative) {" in js  # pas de bouton de changement de plan par paiement

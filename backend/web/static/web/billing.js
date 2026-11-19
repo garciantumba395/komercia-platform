@@ -1,4 +1,4 @@
-/* Komersia – page Abonnement : état, plans, paiement Mobile Money, changement de plan, résiliation, historique, rappels. */
+/* Komersia – page Abonnement : état, plans, paiement Mobile Money ou clé de licence (édition locale), changement de plan, résiliation, historique, rappels. */
 (function () {
   'use strict';
 
@@ -24,6 +24,13 @@
   const inDays = (d) => (d <= 0 ? 'aujourd’hui' : d === 1 ? 'demain' : 'dans ' + d + ' jours');
   const PHONE_RE = /^\+?\d{9,15}$/;
 
+  /** Clé de licence : majuscules, uniquement lettres et chiffres, groupes de 5 séparés par des tirets
+      (les espaces, tirets et minuscules saisis ou collés sont acceptés). */
+  const KEY_GROUP = 5;
+  const keyChars = (text) => String(text || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const keyFormat = (text) => (keyChars(text).match(new RegExp('.{1,' + KEY_GROUP + '}', 'g')) || []).join('-');
+  K.licenseKey = { normalize: keyChars, format: keyFormat };
+
   K.pages.billing = async function billing(view, ctx) {
     const owner = ctx.role === 'owner';
     const S = {
@@ -31,9 +38,12 @@
       currency: ctx.tenant && ctx.tenant.base_currency === 'USD' ? 'USD' : 'CDF',
       phone: (ctx.me && ctx.me.phone) || '',
       sandbox: false,
+      install: null, // { installation_id, short_code } (édition locale)
     };
+    /** Édition locale : pas de paiement en ligne, l'abonnement se renouvelle par clé de licence. */
+    const licenseMode = () => !!(S.sub && S.sub.payments_enabled === false);
     const el = {
-      status: h('div'), notices: h('div'), wait: h('div', { 'aria-live': 'polite' }), limits: h('div'),
+      license: h('div', { id: 'licence' }), status: h('div'), notices: h('div'), wait: h('div', { 'aria-live': 'polite' }), limits: h('div'),
       plansTitle: h('h2', { id: 'plans-title' }, 'Choisir un plan'), plans: h('div'), pay: h('div'), history: h('div'),
     };
     const planOf = (code) => S.plans.find((p) => p.code === code) || null;
@@ -46,6 +56,8 @@
       ctx.sub = S.sub;
       ctx.inactive = false;
       K.renderBanner(B.bannerFor(S.sub, ctx.role));
+      const bannerLink = document.querySelector('#sub-banner a');
+      if (bannerLink && licenseMode()) bannerLink.setAttribute('href', '/app/abonnement/#licence'); // le bouton mène à la carte de licence
     }
     async function loadLists() {
       const [payments, notices] = await Promise.all([
@@ -68,12 +80,16 @@
       const card = h('section', { class: 'card abo-status s-' + sub.state + (urgent ? ' urgent' : ''), 'aria-labelledby': 'abo-state-title' });
       const title = (text) => h('h2', { id: 'abo-state-title' }, text);
       const actions = h('div', { class: 'btn-row' });
-      const choose = (label, code) => h('button', { type: 'button', class: 'btn', onclick: () => (code ? selectPlan(code) : scrollTo(el.plansTitle)) }, label);
+      const choose = (label, code) => (licenseMode()
+        ? h('button', { type: 'button', class: 'btn', onclick: () => focusLicense() }, 'Activer une clé')
+        : h('button', { type: 'button', class: 'btn', onclick: () => (code ? selectPlan(code) : scrollTo(el.plansTitle)) }, label));
 
       if (sub.state === 'trial') {
         card.append(title('Essai gratuit'), h('div', { class: 'big' }, B.daysLabel(d)),
           h('p', null, 'Fin de l’essai le ' + fmtDate(sub.trial_ends_at) + '. Pendant l’essai, vous profitez des fonctions et des limites du plan Pro, sans paiement.'),
-          h('p', { class: 'hint' }, 'Souscrivez avant la fin de l’essai : l’abonnement démarre dès la confirmation du paiement, et sa première échéance tombe un mois plus tard.'));
+          h('p', { class: 'hint' }, licenseMode()
+            ? 'Activez une clé de licence avant la fin de l’essai : l’abonnement démarre dès l’activation de la clé, pour la durée payée.'
+            : 'Souscrivez avant la fin de l’essai : l’abonnement démarre dès la confirmation du paiement, et sa première échéance tombe un mois plus tard.'));
         if (owner) actions.append(choose('Choisir un plan', null));
       } else if (sub.state === 'active') {
         card.append(title('Abonnement actif'), h('div', { class: 'big' }, 'Plan ' + planName(sub.plan)),
@@ -94,7 +110,9 @@
       } else {
         card.append(title('Abonnement terminé'),
           h('p', null, 'Votre ' + (sub.plan ? 'abonnement' : 'essai gratuit') + ' est terminé' + (sub.read_only_since ? ' depuis le ' + fmtDate(sub.read_only_since) : '') + '. Le compte est en lecture seule : vous pouvez consulter vos données, les exporter et imprimer les reçus déjà émis, mais plus encaisser de nouvelles ventes.'),
-          h('p', { class: 'hint' }, 'Vos données sont conservées. Abonnez-vous pour tout réactiver dès la confirmation du paiement.'));
+          h('p', { class: 'hint' }, licenseMode()
+            ? 'Vos données sont conservées. Activez une clé de licence pour tout réactiver immédiatement.'
+            : 'Vos données sont conservées. Abonnez-vous pour tout réactiver dès la confirmation du paiement.'));
         if (owner) actions.append(choose('S’abonner', sub.plan || null));
       }
       if (!owner) card.appendChild(h('p', { class: 'hint' }, 'Seul le propriétaire peut souscrire, payer ou résilier. Vous pouvez consulter l’état et l’historique.'));
@@ -133,6 +151,7 @@
     function renderPlans() {
       const sub = S.sub;
       const noRate = S.plans.some((p) => p.price_cdf_estimate === null || p.price_cdf_estimate === undefined);
+      const indicative = licenseMode();
       const cards = S.plans.map((p) => {
         const mode = modeFor(p);
         const current = sub.state === 'active' && sub.plan === p.code;
@@ -147,7 +166,7 @@
             h('li', null, p.max_stores + (p.max_stores > 1 ? ' boutiques' : ' boutique')),
             h('li', null, p.max_users + ' utilisateurs'),
             p.extra_store_price_usd_minor > 0 ? h('li', null, '+ ' + fmt(p.extra_store_price_usd_minor, 'USD') + ' par boutique supplémentaire') : null));
-        if (owner) {
+        if (owner && !indicative) {
           const label = { subscribe: 'Choisir ' + p.name, renew: 'Payer l’échéance', upgrade: 'Passer au plan ' + p.name, downgrade: 'Passer au plan ' + p.name + ' (fin de période)' }[mode];
           if (scheduled) {
             card.appendChild(h('button', { type: 'button', class: 'btn btn-secondary', disabled: waitingBlocks(), onclick: (e) => keepCurrentPlan(e.currentTarget) }, 'Annuler le changement'));
@@ -157,8 +176,10 @@
         }
         return card;
       });
+      el.plansTitle.textContent = indicative ? 'Plans et prix (indicatifs)' : 'Choisir un plan';
       clear(el.plans).appendChild(h('div', { class: 'plans' }, cards));
-      if (noRate) {
+      if (indicative) el.plans.appendChild(h('p', { class: 'hint' }, 'Prix mensuels à titre indicatif. Le plan et la durée sont ceux de la clé que votre agent vous remet : le paiement se fait hors de l’application.'));
+      if (noRate && !indicative) {
         el.plans.appendChild(h('p', { class: 'hint' }, 'Taux de change non défini : les estimations en francs sont indisponibles. ',
           h('a', { href: '/app/taux/' }, 'Définir le taux dans la page Taux de change'), ' ou payez en dollars.'));
       }
@@ -175,7 +196,7 @@
     /* ---------- paiement / changement ---------- */
     function renderPay() {
       clear(el.pay);
-      if (!owner || !S.plan || waitingBlocks()) return;
+      if (licenseMode() || !owner || !S.plan || waitingBlocks()) return;
       const plan = planOf(S.plan);
       if (!plan) return;
       const mode = modeFor(plan);
@@ -379,17 +400,104 @@
       });
     }
 
+    /* ---------- clé de licence (édition locale) ---------- */
+    function focusLicense() {
+      scrollTo(el.license);
+      const input = el.license.querySelector('input');
+      if (input) input.focus({ preventScroll: true });
+    }
+    const keyDraft = { value: '' };
+    function renderLicense() {
+      clear(el.license);
+      if (!licenseMode()) return;
+      const card = h('section', { class: 'card pay-box', 'aria-labelledby': 'licence-title' });
+      card.appendChild(h('h2', { id: 'licence-title' }, 'Activer ou renouveler votre abonnement'));
+      const inst = S.install;
+      if (inst) {
+        const copy = h('button', { type: 'button', class: 'btn btn-secondary btn-small' }, 'Copier');
+        copy.addEventListener('click', async () => {
+          const text = 'Komersia – code ' + inst.short_code + ' – identifiant ' + inst.installation_id;
+          try { await navigator.clipboard.writeText(text); toast('Identifiant copié.', 'ok'); }
+          catch (e) {
+            const tmp = h('textarea', { style: 'position:fixed;opacity:0' }); tmp.value = text;
+            document.body.appendChild(tmp); tmp.select();
+            try { document.execCommand('copy'); toast('Identifiant copié.', 'ok'); } catch (e2) { toast('Copie impossible : recopiez l’identifiant à la main.', 'error'); }
+            tmp.remove();
+          }
+        });
+        card.append(h('div', { class: 'field' }, h('label', null, 'Identifiant de cette installation'),
+          h('div', { class: 'amount-big', id: 'install-short', style: 'letter-spacing:.08em' }, inst.short_code),
+          h('div', { class: 'hint', id: 'install-id', style: 'word-break:break-all' }, inst.installation_id),
+          h('div', { class: 'btn-row' }, copy)));
+      } else {
+        card.appendChild(K.alertBox('Identifiant d’installation indisponible pour le moment. Rechargez la page.', 'warn'));
+      }
+      card.appendChild(h('ol', { class: 'license-steps' },
+        h('li', null, 'Donnez ce code à votre agent Komersia et payez-lui votre abonnement.'),
+        h('li', null, 'Il vous remet une clé de licence.'),
+        h('li', null, 'Saisissez-la ici.')));
+      if (!owner) {
+        card.appendChild(h('p', { class: 'hint' }, 'Seul le propriétaire peut saisir la clé de licence.'));
+        el.license.appendChild(card);
+        return;
+      }
+      const err = h('div', { 'aria-live': 'polite' });
+      const input = h('input', { type: 'text', id: 'license-key', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false',
+        placeholder: 'XXXXX-XXXXX-XXXXX-…', 'aria-label': 'Clé de licence', style: 'font-family:monospace;letter-spacing:.04em' });
+      input.value = keyDraft.value;
+      input.addEventListener('input', () => {
+        // met en forme au fil de la frappe en gardant le curseur devant le même caractère
+        const pos = input.selectionStart === null ? input.value.length : input.selectionStart;
+        const before = keyChars(input.value.slice(0, pos)).length;
+        const formatted = keyFormat(input.value);
+        input.value = formatted;
+        let np = 0; let seen = 0;
+        while (np < formatted.length && seen < before) { if (formatted[np] !== '-') seen += 1; np += 1; }
+        try { input.setSelectionRange(np, np); } catch (e) { /* champ non focalisé */ }
+        keyDraft.value = formatted;
+        clear(err);
+      });
+      const go = h('button', { type: 'button', class: 'btn btn-big', id: 'license-go' }, 'Activer');
+      const submit = () => {
+        clear(err);
+        if (keyChars(input.value).length < 20) { err.appendChild(K.alertBox('Saisissez la clé de licence remise par votre agent.')); input.focus(); return; }
+        busy(go, async () => {
+          try {
+            const res = await api('billing/license/activate/', { method: 'POST', body: { key: input.value } });
+            keyDraft.value = '';
+            S.sub = res; ctx.sub = res; ctx.inactive = false;
+            K.renderBanner(B.bannerFor(res, ctx.role));
+            S.licenseOk = { plan: res.plan, end: res.current_period_end };
+            toast('Abonnement activé jusqu’au ' + fmtDate(res.current_period_end) + '.', 'ok');
+            await loadLists().catch(() => null);
+            renderAll();
+          } catch (e) { err.appendChild(K.alertBox(e.message)); }
+        });
+      };
+      go.addEventListener('click', submit);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+      card.append(err);
+      if (S.licenseOk) {
+        card.appendChild(h('div', { class: 'alert alert-ok', role: 'status', id: 'license-ok' },
+          'Clé activée : plan ' + planName(S.licenseOk.plan) + ', abonnement actif jusqu’au ' + fmtDate(S.licenseOk.end) + '.'));
+      }
+      card.append(K.field('Clé de licence', input, 'Vous pouvez la saisir avec ou sans tirets, en majuscules ou en minuscules.'),
+        h('div', { class: 'btn-row' }, go));
+      el.license.appendChild(card);
+    }
+
     /* ---------- historique et rappels ---------- */
     function renderHistory() {
       const rows = S.payments.map((p) => {
         const [label, tone] = B.paymentStatus(p.status);
         const when = p.confirmed_at || p.created_at;
+        const lic = p.provider === 'license';
         return h('div', { class: 'row-card' },
           h('div', { class: 'main' },
-            h('div', { class: 'title' }, (B.PAYMENT_KINDS[p.kind] || p.kind) + ' · plan ' + planName(p.plan)),
+            h('div', { class: 'title' }, lic ? 'Clé de licence · ' + (p.months || 1) + ' mois · plan ' + planName(p.plan) : (B.PAYMENT_KINDS[p.kind] || p.kind) + ' · plan ' + planName(p.plan)),
             h('div', { class: 'sub' }, K.fmtDateTime(when) + (p.status === 'confirmed' && p.period_end ? ' · jusqu’au ' + fmtDate(p.period_end) : '')),
             p.currency === 'CDF' && p.amount_usd_minor ? h('div', { class: 'sub' }, 'Équivalent ' + fmt(p.amount_usd_minor, 'USD')) : null),
-          h('div', { class: 'amount' }, fmt(p.amount_minor, p.currency)),
+          h('div', { class: 'amount' }, lic ? 'Clé' : fmt(p.amount_minor, p.currency)),
           h('span', { class: 'badge badge-' + tone }, label),
           p.status === 'confirmed'
             ? h('button', { type: 'button', class: 'btn btn-small btn-secondary', 'aria-label': 'Ouvrir le reçu du ' + K.fmtDate(when), onclick: () => K.openHtml('billing/payments/' + p.id + '/receipt/?format=html') }, 'Reçu')
@@ -421,6 +529,7 @@
     }
 
     function renderAll() {
+      renderLicense();
       renderStatus();
       renderNotices();
       renderLimits();
@@ -433,9 +542,11 @@
     await loadSubscription();
     S.plans = await api('billing/plans/');
     await loadLists();
-    clear(view).append(el.status, el.notices, el.wait, el.limits, el.plansTitle, el.plans, el.pay, el.history);
+    if (licenseMode()) S.install = await api('billing/installation/').catch(() => null);
+    clear(view).append(el.license, el.status, el.notices, el.wait, el.limits, el.plansTitle, el.plans, el.pay, el.history);
     renderAll();
-    if (owner) {
+    if (licenseMode() && window.location.hash === '#licence') focusLicense();
+    if (owner && !licenseMode()) {
       const recent = S.payments.find((p) => p.status === 'pending' && Date.now() - new Date(p.created_at).getTime() < RESUME_MAX_AGE_MS);
       if (recent) startWaiting(recent, recent.phone || S.phone);
     }

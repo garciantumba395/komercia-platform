@@ -7,3 +7,6 @@ staticfiles/
 *.sqlite3
 .env
 backups/
+
+# Clés privées de licence (développement et production) : JAMAIS dans le dépôt
+tools/license/dev-private-key.pem
