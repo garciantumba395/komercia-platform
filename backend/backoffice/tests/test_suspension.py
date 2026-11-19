@@ -80,8 +80,9 @@ def test_double_suspend_does_not_duplicate_audit(tenant_a):
 
 
 def test_unknown_action_404(tenant_a):
-    assert agent_client().get(_toggle_url(tenant_a, "delete")).status_code == 404
-    assert agent_client().post(_toggle_url(tenant_a, "delete"), {"reason": "xxxxxx"}).status_code == 404
+    client = agent_client()
+    assert client.get(_toggle_url(tenant_a, "delete")).status_code == 404
+    assert client.post(_toggle_url(tenant_a, "delete"), {"reason": "xxxxxx"}).status_code == 404
 
 
 def test_suspend_csrf_enforced(tenant_a):

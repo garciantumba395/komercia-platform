@@ -7,6 +7,7 @@ Création du rôle : via la connexion propriétaire si elle le permet ; sinon vi
 `scripts/db-init.sql`, ce que fait la CI).
 """
 
+import importlib
 import os
 
 import psycopg
@@ -63,3 +64,24 @@ def _console_settings(settings):
     cache.clear()  # compteurs de limitation des connexions
     yield
     cache.clear()
+
+
+def _seed_plans():
+    """Plans initiaux (migration billing.0002) : un nettoyage de tables (tests transactionnels) les supprime."""
+    from billing.models import Plan
+
+    for data in importlib.import_module("billing.migrations.0002_initial_plans").PLANS:
+        Plan.objects.get_or_create(code=data["code"], defaults=data)
+
+
+@pytest.fixture(autouse=True)
+def seeded_plans(db):
+    _seed_plans()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def restore_plans_at_end(ops_role_ready, django_db_blocker):
+    """Les tests transactionnels vident les tables : on remet les plans pour les exécutions suivantes (--reuse-db)."""
+    yield
+    with django_db_blocker.unblock():
+        _seed_plans()

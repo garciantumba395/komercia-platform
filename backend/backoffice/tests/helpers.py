@@ -10,8 +10,8 @@ from core.tenancy import tenant_context
 from sales.models import Sale
 
 # Les données doivent être VALIDÉES (transaction=True) pour être visibles par la connexion `ops`, distincte de
-# la connexion `default`. `serialized_rollback` restaure les données de migration (plans) après le nettoyage.
-DB = pytest.mark.django_db(transaction=True, serialized_rollback=True, databases=["default", "ops"])
+# la connexion `default`. Les plans (données de migration) sont remis par la fixture `seeded_plans`.
+DB = pytest.mark.django_db(transaction=True, databases=["default", "ops"])
 
 AGENT_PASSWORD = "Agent-Secret-9731!"
 
