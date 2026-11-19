@@ -1,0 +1,80 @@
+{% extends "backoffice/base.html" %}
+{% load ops_extras %}
+{% block title %}{{ tenant.name }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'ops:tenant_list' %}">← Entreprises</a></p>
+<h1>{{ tenant.name }}
+  {% if tenant.is_active %}<span class="badge good">Active</span>{% else %}<span class="badge bad">Suspendue</span>{% endif %}</h1>
+<p class="muted">{{ tenant.get_sector_display }} · inscrite le {{ tenant.created_at|date:"d/m/Y" }} · propriétaire : {{ tenant.owner_name|default:"—" }} ({{ tenant.owner_phone|default:"—" }})
+ · {{ tenant.store_count }} boutique(s) · {{ tenant.user_count }} utilisateur(s) · dernière vente : {{ tenant.last_sale_at|date:"d/m/Y H:i"|default:"—" }}</p>
+
+<div class="card">
+  {% if tenant.is_active %}
+  <a href="{% url 'ops:tenant_toggle' tenant.id 'suspend' %}">Suspendre cette entreprise…</a>
+  {% else %}
+  <a href="{% url 'ops:tenant_toggle' tenant.id 'reactivate' %}">Réactiver cette entreprise…</a>
+  {% endif %}
+</div>
+
+<h2>Abonnement</h2>
+{% if subscription %}
+<table>
+  <tr><th>État</th><td>{{ subscription.state|state_label }}</td><th>Plan</th><td>{{ subscription.plan.name|default:"—" }}</td></tr>
+  <tr><th>Fin d'essai</th><td>{{ subscription.trial_ends_at|date:"d/m/Y"|default:"—" }}</td><th>Fin de période</th><td>{{ subscription.current_period_end|date:"d/m/Y"|default:"—" }}</td></tr>
+  <tr><th>Fin de grâce</th><td>{{ subscription.grace_ends_at|date:"d/m/Y"|default:"—" }}</td><th>Lecture seule depuis</th><td>{{ subscription.read_only_since|date:"d/m/Y"|default:"—" }}</td></tr>
+  <tr><th>Résiliation en fin de période</th><td>{{ subscription.cancel_at_period_end|yesno:"Oui,Non" }}</td><th>Ventes ce mois (nombre)</th><td>{{ month_sales_count }}</td></tr>
+</table>
+{% else %}<p class="muted">Aucun abonnement.</p>{% endif %}
+
+<h2>Derniers paiements d'abonnement</h2>
+<table>
+  <tr><th>Date</th><th>Référence</th><th>Plan</th><th>Montant</th><th>Statut</th><th>Fournisseur</th></tr>
+  {% for p in payments %}<tr><td class="nowrap">{{ p.created_at|date:"d/m/Y H:i" }}</td><td>{{ p.reference }}</td><td>{{ p.plan__name }}</td>
+    <td>{{ p.amount_minor|money:p.currency }}</td><td>{{ p.status }}</td><td>{{ p.provider }}</td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Aucun paiement.</td></tr>{% endfor %}
+</table>
+
+<h2>Utilisateurs</h2>
+<table>
+  <tr><th>Nom</th><th>Téléphone</th><th>Rôle</th><th>Actif</th></tr>
+  {% for u in users %}<tr><td>{{ u.user__full_name }}</td><td>{{ u.user__phone }}</td><td>{{ u.role }}</td><td>{{ u.is_active|yesno:"Oui,Non" }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">Aucun utilisateur.</td></tr>{% endfor %}
+</table>
+
+<h2>Accès de support (consentement du propriétaire)</h2>
+<div class="card">
+{% if grant %}
+  <p><span class="badge good">Accès valide</span> jusqu'au {{ grant.expires_at|date:"d/m/Y H:i" }} (lecture seule).
+  Chaque consultation est journalisée dans l'audit de l'entreprise.</p>
+  <p><a href="{% url 'ops:support_data' tenant.id 'sales' %}">Ventes récentes</a> ·
+     <a href="{% url 'ops:support_data' tenant.id 'products' %}">Produits</a> ·
+     <a href="{% url 'ops:support_data' tenant.id 'customers' %}">Clients</a></p>
+{% else %}
+  <p><span class="badge">Aucun accès</span> Les ventes, produits et clients ne sont pas consultables : le propriétaire doit accorder un accès temporaire depuis son application.</p>
+{% endif %}
+{% if grants %}<table><tr><th>Accordé le</th><th>Par</th><th>Expire</th><th>Révoqué</th></tr>
+  {% for g in grants %}<tr><td>{{ g.created_at|date:"d/m/Y H:i" }}</td><td>{{ g.granted_by__full_name }}</td><td>{{ g.expires_at|date:"d/m/Y H:i" }}</td><td>{{ g.revoked_at|date:"d/m/Y H:i"|default:"—" }}</td></tr>{% endfor %}</table>{% endif %}
+</div>
+
+<h2>Fonctions activées</h2>
+<table>
+  <tr><th>Fonction</th><th>État</th><th>Modifier (propriétaires de la plateforme)</th></tr>
+  {% for f in flag_rows %}<tr><td>{{ f.label }} <span class="muted">({{ f.key }})</span></td>
+    <td>{% if f.enabled is None %}par défaut (désactivée){% elif f.enabled %}activée{% else %}désactivée{% endif %}</td>
+    <td>{% if request.user.is_superuser %}
+      <form method="post" action="{% url 'ops:tenant_flag' tenant.id %}">{% csrf_token %}
+        <input type="hidden" name="key" value="{{ f.key }}">
+        <label><input type="checkbox" name="enabled" {% if f.enabled %}checked{% endif %}> activée</label>
+        <input name="reason" placeholder="Motif (obligatoire)" required minlength="5" maxlength="500">
+        <button class="primary" type="submit">Enregistrer</button>
+      </form>{% else %}<span class="muted">Réservé</span>{% endif %}</td></tr>
+  {% endfor %}
+</table>
+
+<h2>Dernières entrées d'audit</h2>
+<table>
+  <tr><th>Date</th><th>Action</th><th>Objet</th><th>Par</th><th>Motif</th></tr>
+  {% for a in audit %}<tr><td class="nowrap">{{ a.created_at|date:"d/m/Y H:i" }}</td><td>{{ a.action }}</td><td>{{ a.entity_type }}</td><td>{{ a.user__full_name|default:"—" }}</td><td>{{ a.reason|default:"—" }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="muted">Aucune entrée.</td></tr>{% endfor %}
+</table>
+{% endblock %}

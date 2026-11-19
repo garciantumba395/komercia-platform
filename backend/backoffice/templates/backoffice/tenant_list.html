@@ -1,0 +1,43 @@
+{% extends "backoffice/base.html" %}
+{% load ops_extras %}
+{% block title %}Entreprises{% endblock %}
+{% block content %}
+<h1>Entreprises</h1>
+<form method="get" class="card">
+  <input name="q" value="{{ q }}" placeholder="Nom ou téléphone du propriétaire">
+  <select name="state">
+    <option value="">Tous les abonnements</option>
+    {% for code, label in states %}<option value="{{ code }}" {% if state == code %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    <option value="none" {% if state == "none" %}selected{% endif %}>Aucun abonnement</option>
+  </select>
+  <select name="status">
+    <option value="">Actives et suspendues</option>
+    <option value="active" {% if status == "active" %}selected{% endif %}>Actives</option>
+    <option value="suspended" {% if status == "suspended" %}selected{% endif %}>Suspendues</option>
+  </select>
+  <button class="primary" type="submit">Filtrer</button>
+</form>
+<p class="muted">{{ page.paginator.count }} entreprise(s).</p>
+<table>
+  <tr><th>Entreprise</th><th>Secteur</th><th>Inscrite le</th><th>Abonnement</th><th>Plan</th><th>Échéance</th>
+      <th>Dernière vente</th><th>Boutiques</th><th>Utilisateurs</th><th>Statut</th></tr>
+  {% for t in page %}
+  <tr>
+    <td><a href="{% url 'ops:tenant_detail' t.id %}">{{ t.name }}</a><br><span class="muted">{{ t.owner_phone|default:"—" }}</span></td>
+    <td>{{ t.get_sector_display }}</td>
+    <td class="nowrap">{{ t.created_at|date:"d/m/Y" }}</td>
+    <td>{{ t.sub_state|state_label }}</td>
+    <td>{{ t.plan_name|default:"—" }}</td>
+    <td class="nowrap">{% if t.sub_state == "trial" %}{{ t.trial_ends_at|date:"d/m/Y"|default:"—" }}{% else %}{{ t.period_end|date:"d/m/Y"|default:"—" }}{% endif %}</td>
+    <td class="nowrap">{{ t.last_sale_at|date:"d/m/Y H:i"|default:"—" }}</td>
+    <td>{{ t.store_count }}</td><td>{{ t.user_count }}</td>
+    <td>{% if t.is_active %}<span class="badge good">Active</span>{% else %}<span class="badge bad">Suspendue</span>{% endif %}</td>
+  </tr>
+  {% empty %}<tr><td colspan="10" class="muted">Aucune entreprise.</td></tr>{% endfor %}
+</table>
+<p>
+  {% if page.has_previous %}<a href="?q={{ q|urlencode }}&state={{ state }}&status={{ status }}&page={{ page.previous_page_number }}">← Précédent</a>{% endif %}
+  Page {{ page.number }} / {{ page.paginator.num_pages }}
+  {% if page.has_next %}<a href="?q={{ q|urlencode }}&state={{ state }}&status={{ status }}&page={{ page.next_page_number }}">Suivant →</a>{% endif %}
+</p>
+{% endblock %}

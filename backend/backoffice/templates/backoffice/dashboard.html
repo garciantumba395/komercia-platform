@@ -1,0 +1,32 @@
+{% extends "backoffice/base.html" %}
+{% load ops_extras %}
+{% block title %}Indicateurs{% endblock %}
+{% block content %}
+<h1>Indicateurs de la plateforme</h1>
+<p class="muted">Calculés le {{ m.now|date:"d/m/Y H:i" }}. Définitions détaillées dans <code>backoffice/metrics.py</code>.</p>
+<h2>Entreprises</h2>
+<div class="tiles">
+  <div class="tile">Actives<b>{{ m.tenants.active }}</b></div>
+  <div class="tile">En essai<b>{{ m.tenants.trial }}</b></div>
+  <div class="tile">Abonnées (actives)<b>{{ m.tenants.subscribed }}</b></div>
+  <div class="tile">En retard<b>{{ m.tenants.past_due }}</b></div>
+  <div class="tile">Lecture seule<b>{{ m.tenants.read_only }}</b></div>
+  <div class="tile">Suspendues<b>{{ m.tenants.suspended }}</b></div>
+  <div class="tile">Inscriptions 7 j<b>{{ m.tenants.signups_7d }}</b></div>
+  <div class="tile">Inscriptions 30 j<b>{{ m.tenants.signups_30d }}</b></div>
+</div>
+<h2>Revenus et fidélisation</h2>
+<div class="tiles">
+  <div class="tile">MRR<b>{{ m.revenue.mrr_usd_minor|usd }}</b><span class="muted">{{ m.revenue.paying_count }} abonnement(s) payant(s)</span></div>
+  <div class="tile">ARPU<b>{{ m.revenue.arpu_usd_minor|usd }}</b></div>
+  <div class="tile">Conversion essai → abonné<b>{{ m.conversion.rate_pct|pct }}</b><span class="muted">{{ m.conversion.converted }} / {{ m.conversion.ended_trials }} essais terminés</span></div>
+  <div class="tile">Churn du mois<b>{{ m.churn.rate_pct|pct }}</b><span class="muted">{{ m.churn.lost }} / {{ m.churn.start_subscribers }} abonnés</span></div>
+  <div class="tile">Paiements d'abonnement réussis (30 j)<b>{{ m.payments.rate_pct|pct }}</b><span class="muted">{{ m.payments.confirmed }} / {{ m.payments.finished }}</span></div>
+</div>
+<h2>Ventes enregistrées sur 7 jours</h2>
+<table>
+  <tr><th>Devise</th><th>Nombre de ventes</th><th>Total</th></tr>
+  {% for row in m.sales_7d %}<tr><td>{{ row.currency }}</td><td>{{ row.count }}</td><td>{{ row.total_minor|money:row.currency }}</td></tr>
+  {% empty %}<tr><td colspan="3" class="muted">Aucune vente.</td></tr>{% endfor %}
+</table>
+{% endblock %}

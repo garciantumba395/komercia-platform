@@ -1,0 +1,8 @@
+{% extends "backoffice/support_base.html" %}
+{% block data %}
+<table>
+  <tr><th>Nom</th><th>Téléphone</th><th>Actif</th><th>Créé le</th></tr>
+  {% for r in rows %}<tr><td>{{ r.name }}</td><td>{{ r.phone|default:"—" }}</td><td>{{ r.is_active|yesno:"Oui,Non" }}</td><td>{{ r.created_at|date:"d/m/Y" }}</td></tr>
+  {% empty %}<tr><td colspan="4" class="muted">Aucun client.</td></tr>{% endfor %}
+</table>
+{% endblock %}

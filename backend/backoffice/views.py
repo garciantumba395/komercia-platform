@@ -86,6 +86,8 @@ def tenant_detail(request, tenant_id: uuid.UUID):
 @access.ops_required
 def tenant_toggle(request, tenant_id: uuid.UUID, action: str):
     """GET : page de confirmation avec motif ; POST : applique (motif et confirmation obligatoires)."""
+    if action not in ("suspend", "reactivate"):
+        raise Http404
     overview = _tenant_or_404(tenant_id)
     suspend = action == "suspend"
     context = {"tenant": overview["tenant"], "suspend": suspend, "reason": ""}
