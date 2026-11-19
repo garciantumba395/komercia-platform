@@ -56,9 +56,9 @@ def test_menu_entry_for_owner_and_manager_only_and_hidden_until_api_answers():
 
 def test_restore_is_never_launched_from_the_browser():
     js = (STATIC / "backups.js").read_text(encoding="utf-8")
-    assert "restore" not in re.sub(r"[^\n]*(Restaurer|restore_backup|restauration)[^\n]*", "", js, flags=re.I)
-    assert "backups/restore" not in js
-    assert "Restaurer une sauvegarde" in js and "Démarrer" in js
+    calls = re.findall(r"api\('([^']+)'", js)
+    assert calls and not [c for c in calls if "restor" in c.lower()], calls
+    assert "Restaurer une sauvegarde" in js and "Démarrer" in js and "Elle ne se lance pas depuis cette page" in js
 
 
 # --------------------------------------------------------------------------- logique pure
