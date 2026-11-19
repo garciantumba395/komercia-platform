@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "audit",
     "web",
     "sync",
+    "billing",
 ]
 
 MIDDLEWARE = [
