@@ -1,0 +1,87 @@
+# Environnement de développement Komersia : PostgreSQL 16 + migrations + application.
+# Démarrage : cp .env.example .env && docker compose up --build
+# Les valeurs de .env.example sont factices (développement uniquement).
+
+name: komersia
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?définir POSTGRES_PASSWORD dans .env}
+      POSTGRES_DB: ${DB_NAME:-komersia}
+      # Lus par scripts/docker-initdb.sh pour créer les rôles komersia_owner / komersia_app.
+      KOMERSIA_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?définir DB_OWNER_PASSWORD dans .env}
+      KOMERSIA_APP_PASSWORD: ${DB_PASSWORD:?définir DB_PASSWORD dans .env}
+      KOMERSIA_BACKUP_PASSWORD: ${BACKUP_DB_PASSWORD:?définir BACKUP_DB_PASSWORD dans .env}
+      KOMERSIA_OPS_PASSWORD: ${DB_OPS_PASSWORD:?définir DB_OPS_PASSWORD dans .env}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # Initialisation au premier démarrage uniquement (volume vide) : rôles, base, privilèges.
+      - ./scripts/db-init.sql:/opt/komersia/db-init.sql:ro
+      - ./scripts/docker-initdb.sh:/docker-entrypoint-initdb.d/10-komersia-init.sh:ro
+    ports:
+      - "${DB_PUBLISHED_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${DB_NAME:-komersia}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # Migrations avec le rôle PROPRIÉTAIRE, puis arrêt.
+  migrate:
+    build: ./backend
+    command: ["python", "manage.py", "migrate", "--noinput"]
+    restart: "no"
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-only-insecure-key-change-me}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:-komersia}
+      DB_USER: ${DB_OWNER_USER:-komersia_owner}
+      DB_PASSWORD: ${DB_OWNER_PASSWORD:?définir DB_OWNER_PASSWORD dans .env}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Application : gunicorn avec le rôle APPLICATIF (non propriétaire, soumis à la RLS).
+  web:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-only-insecure-key-change-me}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      THROTTLE_ANON: ${THROTTLE_ANON:-60/min}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:-komersia}
+      DB_USER: ${DB_USER:-komersia_app}
+      DB_PASSWORD: ${DB_PASSWORD:?définir DB_PASSWORD dans .env}
+      # Console d'exploitation /ops/ : rôle BYPASSRLS à droits minimaux (alias de base `ops`).
+      DB_OPS_USER: ${DB_OPS_USER:-komersia_ops}
+      DB_OPS_PASSWORD: ${DB_OPS_PASSWORD:?définir DB_OPS_PASSWORD dans .env}
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # Une réponse HTTP quelconque (même 404/401) prouve que gunicorn répond ; seule une erreur de connexion échoue.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request, urllib.error\ntry:\n    urllib.request.urlopen('http://127.0.0.1:8000/api/docs/', timeout=4)\nexcept urllib.error.HTTPError:\n    pass"
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  db_data:

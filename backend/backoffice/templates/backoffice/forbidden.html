@@ -1,0 +1,7 @@
+{% extends "backoffice/base.html" %}
+{% block title %}Accès refusé{% endblock %}
+{% block content %}
+<h1>Accès refusé</h1>
+<div class="msg error">{{ message }}</div>
+{% if back %}<p><a href="{{ back }}">Retour à la fiche</a></p>{% endif %}
+{% endblock %}

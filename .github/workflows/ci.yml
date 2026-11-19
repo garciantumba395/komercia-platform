@@ -1,0 +1,137 @@
+# Intégration continue Komersia : lint, migrations, tests (dont isolation multi-tenant) sur PostgreSQL 16.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+# Annule les exécutions obsolètes d'une même branche.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (lint, migrations, tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          # Valeurs factices propres à la CI (base éphémère, jamais exposée).
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-postgres-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Connexion de Django : rôle PROPRIÉTAIRE pour les migrations et les tests (le rôle applicatif
+      # est exercé par les tests d'isolation eux-mêmes, voir backend/README.md).
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_NAME: komersia
+      DB_USER: komersia_owner
+      DB_PASSWORD: ci-owner-password
+      # Console d'exploitation (alias `ops`) : rôle komersia_ops créé par scripts/db-init.sql.
+      DB_OPS_USER: komersia_ops
+      DB_OPS_PASSWORD: ci-ops-password
+      # Mot de passe du rôle applicatif komersia_app (créé plus bas par db-init.sql), pour les tests qui s'y connectent.
+      KOMERSIA_TEST_APP_PASSWORD: ci-app-password
+      DJANGO_SECRET_KEY: ci-only-not-a-secret
+      DJANGO_DEBUG: "0"
+      DJANGO_ALLOWED_HOSTS: localhost
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Installer uv (avec cache)
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Outils PostgreSQL 16 (même version que le service de base de données)
+        # Les tests de sauvegarde/restauration lancent pg_dump et pg_restore. Le client préinstallé sur le
+        # runner est plus récent que le serveur postgres:16 : son fichier contient des instructions que
+        # PostgreSQL 16 ne connaît pas (ex. « SET transaction_timeout »), et la restauration échoue.
+        working-directory: .
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
+          /usr/lib/postgresql/16/bin/pg_dump --version
+          echo "KOMERSIA_PG_BIN=/usr/lib/postgresql/16/bin" >> "$GITHUB_ENV"
+
+      - name: Créer les rôles et la base PostgreSQL
+        working-directory: .
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: ci-postgres-password
+        run: |
+          psql -v ON_ERROR_STOP=1 \
+            -v owner_password="$DB_PASSWORD" \
+            -v app_password=ci-app-password \
+            -v ops_password=ci-ops-password \
+            -v db_name="$DB_NAME" \
+            -f scripts/db-init.sql
+
+      - name: Installer les dépendances (uv sync)
+        run: uv sync --frozen
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Migrations (rôle propriétaire)
+        run: uv run python manage.py migrate --noinput
+
+      - name: Vérifier l'absence de migration manquante
+        run: uv run python manage.py makemigrations --check --dry-run
+
+      - name: Vérifier que les tests d'isolation multi-tenant existent
+        # Garde-fou (ADR 0001, règle 5) : un renommage ou une suppression accidentelle des tests
+        # d'isolation ne doit pas faire passer la CI au vert sans qu'ils tournent.
+        run: |
+          uv run pytest -o addopts="" --collect-only -q -k isolation | tee /tmp/isolation-collect.txt
+          COUNT=$(grep -c '::' /tmp/isolation-collect.txt || true)
+          echo "Tests d'isolation collectés : ${COUNT}"
+          if [ "${COUNT}" -lt 6 ]; then
+            echo "::error::Moins de 6 tests d'isolation collectés (attendu : accounts/tests/test_tenant_isolation.py au minimum)."
+            exit 1
+          fi
+
+      - name: Tests d'isolation multi-tenant (bloquants)
+        run: uv run pytest -k isolation --create-db -v
+
+      - name: Suite de tests complète (rôle propriétaire)
+        run: uv run pytest --create-db
+
+  # TODO : déploiement automatique vers l'environnement de test (après validation du
+  # backend ci-dessus). À définir lorsque l'hébergement sera choisi (cahier des charges,
+  # section 22). Volontairement non implémenté.

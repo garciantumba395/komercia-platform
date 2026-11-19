@@ -1,0 +1,16 @@
+{% extends "backoffice/base.html" %}
+{% block title %}{% if suspend %}Suspendre{% else %}Réactiver{% endif %} {{ tenant.name }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'ops:tenant_detail' tenant.id %}">← {{ tenant.name }}</a></p>
+<h1>{% if suspend %}Suspendre{% else %}Réactiver{% endif %} « {{ tenant.name }} »</h1>
+{% if suspend %}<p>L'entreprise et tous ses utilisateurs ne pourront plus utiliser l'application ni l'API tant qu'elle n'est pas réactivée.</p>
+{% else %}<p>L'entreprise retrouvera l'accès à l'application et à l'API.</p>{% endif %}
+{% if error %}<div class="msg error">{{ error }}</div>{% endif %}
+<form method="post" class="card">
+  {% csrf_token %}
+  <p><label>Motif (obligatoire, journalisé dans l'audit de l'entreprise)<br>
+  <textarea name="reason" rows="3" maxlength="500" required>{{ reason }}</textarea></label></p>
+  <p><label><input type="checkbox" name="confirm" value="yes"> Je confirme {% if suspend %}la suspension{% else %}la réactivation{% endif %}.</label></p>
+  <button type="submit" class="{% if suspend %}danger{% else %}primary{% endif %}">{% if suspend %}Suspendre{% else %}Réactiver{% endif %}</button>
+</form>
+{% endblock %}

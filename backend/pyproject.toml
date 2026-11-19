@@ -1,0 +1,35 @@
+[project]
+name = "komersia-backend"
+version = "0.1.0"
+description = "Backend Komersia : SaaS multi-tenant de gestion commerciale"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=5.1,<5.3",
+    "djangorestframework>=3.15",
+    "drf-spectacular>=0.27",
+    "psycopg[binary]>=3.2",
+    "gunicorn>=22",
+    "whitenoise>=6.7",
+    "cryptography>=42",   # clés de licence (signatures Ed25519)
+    "waitress>=3.0",      # serveur WSGI de l'édition locale Windows (gunicorn ne tourne pas sous Windows)
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-django>=4.9",
+    "ruff>=0.6",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "komersia.settings"
+python_files = ["tests.py", "test_*.py"]
+addopts = "-q --reuse-db"
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+extend-exclude = ["*/migrations/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
