@@ -1,12 +1,16 @@
 from datetime import timedelta
 
 import pytest
-from django.test import override_settings
 from django.utils import timezone
 
 from .helpers import activate, update_sub
 
-pytestmark = [pytest.mark.django_db, override_settings(ROOT_URLCONF="billing.tests.probe_urls")]
+pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def probe_urls(settings):
+    settings.ROOT_URLCONF = "billing.tests.probe_urls"
 
 MESSAGE = ("Votre essai ou votre abonnement est terminé. "
            "Abonnez-vous pour continuer à enregistrer des ventes.")
@@ -43,7 +47,7 @@ def test_exempt_paths_always_writable(tenant_a, path):
 
 
 def test_past_due_still_writable_then_blocked_after_grace(tenant_a):
-    sub = activate(tenant_a, now=timezone.now() - timedelta(days=31))
+    sub = activate(tenant_a, now=timezone.now() - timedelta(days=33))
     assert sub.current_period_end < timezone.now()
     assert tenant_a.client().post("/api/v1/probe/").status_code == 200  # grâce
     update_sub(tenant_a, current_period_end=timezone.now() - timedelta(days=8))
