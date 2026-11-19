@@ -10,7 +10,8 @@ from django.shortcuts import redirect, render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST, require_safe
 
-from . import access, metrics, platform_audit as pa, queries, services
+from . import access, metrics, queries, services
+from . import platform_audit as pa
 from .flags import KNOWN_FLAGS
 
 SESSION_SECONDS = 8 * 3600  # une journée de travail ; l'agent se reconnecte ensuite

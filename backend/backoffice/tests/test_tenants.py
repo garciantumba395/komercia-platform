@@ -9,7 +9,7 @@ from billing.models import Plan, Subscription
 from core.permissions import CASHIER
 from core.tenancy import tenant_context
 
-from .helpers import DB, DAY, agent_client, make_sale
+from .helpers import DAY, DB, agent_client, make_sale
 
 pytestmark = DB
 

@@ -9,7 +9,7 @@ from billing.models import Plan, Subscription, SubscriptionPayment
 from core.tenancy import tenant_context
 from currency.models import ExchangeRate  # noqa: F401  (assure le chargement des modèles)
 
-from .helpers import DB, DAY, agent_client, make_sale
+from .helpers import DAY, DB, agent_client, make_sale
 
 pytestmark = DB
 
