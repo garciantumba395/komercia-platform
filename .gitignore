@@ -6,7 +6,9 @@ __pycache__/
 staticfiles/
 *.sqlite3
 .env
-backups/
+# Dossiers de sauvegardes de données (à la racine) et fichiers de sauvegarde ; PAS le code backend/backups/
+/backups/
+*.dump
 
 # Clés privées de licence (développement et production) : JAMAIS dans le dépôt
 tools/license/dev-private-key.pem

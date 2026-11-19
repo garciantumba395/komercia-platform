@@ -1,0 +1,108 @@
+# Installateur Windows de Komersia (édition locale) : construction + test d'intégration sur un VRAI Windows.
+# Voir docs/dev/edition-locale.md. Déclenché à la demande (onglet Actions > « Installateur Windows » > Run workflow)
+# et sur les étiquettes v* (ex. v1.0.0). L'installateur Komersia-Setup-<version>.exe est publié comme artefact,
+# SEULEMENT si le test d'intégration réussit.
+name: Installateur Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version de l'installateur (ex. 1.0.0). Vide : fichier desktop/VERSION."
+        required: false
+        default: ""
+      print_pg_hash:
+        description: "Seulement afficher la somme SHA-256 du zip PostgreSQL (à copier dans desktop/build/postgres.json), sans construire."
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pg-hash:
+    name: Somme SHA-256 de PostgreSQL
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.print_pg_hash }}
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Calculer la somme SHA-256 du zip PostgreSQL
+        shell: pwsh
+        run: ./desktop/build/build.ps1 -PrintPgHash
+
+  build:
+    name: Construire, installer et tester sur Windows
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.print_pg_hash) }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      UV_NO_PROGRESS: "1"
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Installer uv (avec cache)
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Installer Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "choco install innosetup a échoué ($LASTEXITCODE)" }
+
+      - name: Déterminer la version
+        id: ver
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -like 'refs/tags/v*') { $v = $env:GITHUB_REF_NAME.Substring(1) }
+          elseif ('${{ inputs.version }}'.Trim()) { $v = '${{ inputs.version }}'.Trim() }
+          else { $v = (Get-Content -Raw desktop/VERSION).Trim() }
+          if ($v -notmatch '^\d+\.\d+\.\d+([.-][0-9A-Za-z.-]+)?$') { throw "Version invalide : $v" }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Version : $v"
+
+      - name: Construire l'installateur (PostgreSQL portable, PyInstaller, Inno Setup)
+        shell: pwsh
+        run: ./desktop/build/build.ps1 -Version '${{ steps.ver.outputs.version }}'
+
+      - name: Test d'intégration (installation, démarrage, inscription, vente, arrêt, désinstallation)
+        shell: pwsh
+        run: |
+          ./desktop/build/ci-integration-test.ps1 `
+            -Setup "$PWD/desktop/build/output/Komersia-Setup-${{ steps.ver.outputs.version }}.exe" `
+            -Port 8000 -LogDir "$PWD/ci-logs"
+
+      - name: Publier l'installateur (artefact téléchargeable)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Komersia-Setup-${{ steps.ver.outputs.version }}
+          path: |
+            desktop/build/output/Komersia-Setup-${{ steps.ver.outputs.version }}.exe
+            desktop/build/output/Komersia-Setup-${{ steps.ver.outputs.version }}.exe.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publier les journaux (en cas d'échec ou non)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: journaux-windows-${{ steps.ver.outputs.version }}
+          path: ci-logs
+          if-no-files-found: ignore
+          retention-days: 14
