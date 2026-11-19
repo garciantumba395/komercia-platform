@@ -115,7 +115,9 @@ def test_cost_hidden_for_cashier_visible_for_owner_and_manager(tenant_a):
     cashier = body(cashier_resp)["changes"]["products"][0]
     assert owner["cost_minor"] == 700 and manager["cost_minor"] == 700
     assert "cost_minor" not in cashier
-    assert b"700" not in cashier_resp.content.replace(b"price", b"")  # nulle part dans la réponse
+    # Aucun champ de coût nulle part dans la réponse (on cherche les NOMS de champs, pas la valeur 700 :
+    # un identifiant ou un curseur peut contenir « 700 » par hasard).
+    assert b'"cost' not in cashier_resp.content
 
 
 def test_current_exchange_rate_and_null_when_missing(tenant_a):
