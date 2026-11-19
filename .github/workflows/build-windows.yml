@@ -69,9 +69,11 @@ jobs:
       - name: Déterminer la version
         id: ver
         shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           if ($env:GITHUB_REF -like 'refs/tags/v*') { $v = $env:GITHUB_REF_NAME.Substring(1) }
-          elseif ('${{ inputs.version }}'.Trim()) { $v = '${{ inputs.version }}'.Trim() }
+          elseif ($env:INPUT_VERSION -and $env:INPUT_VERSION.Trim()) { $v = $env:INPUT_VERSION.Trim() }
           else { $v = (Get-Content -Raw desktop/VERSION).Trim() }
           if ($v -notmatch '^\d+\.\d+\.\d+([.-][0-9A-Za-z.-]+)?$') { throw "Version invalide : $v" }
           "version=$v" >> $env:GITHUB_OUTPUT

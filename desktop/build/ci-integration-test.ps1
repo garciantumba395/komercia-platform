@@ -206,7 +206,9 @@ try {
     Assert (-not (Test-Path $exe)) 'KomersiaServer.exe est encore installé'
     Assert ($null -eq (Get-ScheduledTask -TaskName 'Komersia' -ErrorAction SilentlyContinue)) 'La tâche planifiée existe encore'
     Assert ($null -eq (Get-NetFirewallRule -DisplayName 'Komersia' -ErrorAction SilentlyContinue)) 'La règle de pare-feu existe encore'
-    Assert (Test-Path (Join-Path $DataDir 'pgdata\PG_VERSION')) 'Les données ont été supprimées alors qu''elles devaient être conservées'
+    # (pgdata est réservé au service : l'administrateur ne peut pas y entrer ; on teste les fichiers de config.)
+    Assert ((Test-Path (Join-Path $DataDir 'config\secrets.json')) -and (Test-Path (Join-Path $DataDir 'config\state.json'))) 'Les données ont été supprimées alors qu''elles devaient être conservées'
+    Assert (Test-Path (Join-Path $DataDir 'pgdata')) 'Le dossier pgdata a été supprimé alors qu''il devait être conservé'
 
     Step '11. Réinstallation : les données de la boutique sont retrouvées'
     Invoke-Installer @("/PORT=$Port") 'setup-reinstall.log'
