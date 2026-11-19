@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 
 from audit import services as audit
 from audit.mixins import AuditedMixin
-from core.permissions import ACCOUNTANT, CASHIER, MANAGER, OWNER, STOREKEEPER, HasRole
+from core.permissions import ACCOUNTANT, CASHIER, MANAGER, OWNER, ROLES, STOREKEEPER, HasRole
 
 from .models import Membership, Store, User
 from .serializers import (
@@ -121,6 +121,16 @@ class MemberViewSet(viewsets.ViewSet):
         if member.user_id == request.user.id:
             return Response({"detail": "Vous ne pouvez pas modifier votre propre rôle."}, 400)
         before = {"role": member.role, "is_active": member.is_active}
+        if "role" in request.data:
+            new_role = request.data["role"]
+            assignable = [code for code, _label in ROLES if code != OWNER]
+            if member.role == OWNER:
+                return Response({"detail": "Le rôle d'un propriétaire ne peut pas être modifié."}, 400)
+            if new_role == OWNER:
+                return Response({"detail": "Le transfert de propriété n'est pas disponible."}, 400)
+            if new_role not in assignable:
+                return Response({"detail": "Rôle inconnu."}, 400)
+            member.role = new_role
         if "is_active" in request.data:
             member.is_active = bool(request.data["is_active"])
         member.save()
