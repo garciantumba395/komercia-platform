@@ -52,6 +52,8 @@ def _atomic_write(path: Path, text: str, *, private: bool) -> None:
             fh.write(text)
         if private:
             winsec.restrict_to_service_account(tmp)
+        else:
+            os.chmod(tmp, 0o644)  # lisible par les autres comptes (ports, état) ; sans effet sur les secrets
         os.replace(tmp, path)
     except BaseException:
         tmp.unlink(missing_ok=True)

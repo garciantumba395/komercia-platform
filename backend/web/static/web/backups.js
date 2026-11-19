@@ -87,13 +87,13 @@
       const card = h('section', { class: 'card' }, h('h2', null, 'Où sauvegarder'));
       const folder = K.input({ type: 'text', value: s.folder, autocomplete: 'off', spellcheck: 'false', disabled: !owner, placeholder: 'D:\\Sauvegardes' });
       const keep = K.input({ type: 'number', min: '1', max: '365', inputmode: 'numeric', value: String(s.retention), disabled: !owner });
-      const auto = K.input({ type: 'checkbox', checked: !!s.enabled, disabled: !owner });
+      const auto = K.input({ type: 'checkbox', id: 'bkp-auto', checked: !!s.enabled, disabled: !owner });
       const error = h('div', { 'aria-live': 'polite' });
       card.append(
         K.field('Dossier de destination', folder,
           'Sur le PC principal, par exemple D:\\Sauvegardes ou la lettre de votre clé USB (E:\\Komersia). Le dossier doit exister. Choisissez un disque ou une clé différents de ceux où Komersia est installé.'),
         K.field('Nombre de sauvegardes à conserver', keep, 'Les plus anciennes sont supprimées automatiquement ; la plus récente est toujours gardée.'),
-        h('div', { class: 'field check' }, auto, h('label', { for: (auto.id = auto.id || 'bkp-auto') }, 'Sauvegarde automatique chaque jour')),
+        h('div', { class: 'field check' }, auto, h('label', { for: 'bkp-auto' }, 'Sauvegarde automatique chaque jour')),
         error);
       if (owner) {
         const save = h('button', { type: 'button', class: 'btn', id: 'bkp-save' }, 'Enregistrer');
