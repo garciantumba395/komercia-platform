@@ -68,6 +68,23 @@ jobs:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
 
+      - name: Outils PostgreSQL 16 (même version que le service de base de données)
+        # Les tests de sauvegarde/restauration lancent pg_dump et pg_restore. Le client préinstallé sur le
+        # runner est plus récent que le serveur postgres:16 : son fichier contient des instructions que
+        # PostgreSQL 16 ne connaît pas (ex. « SET transaction_timeout »), et la restauration échoue.
+        working-directory: .
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
+          /usr/lib/postgresql/16/bin/pg_dump --version
+          echo "KOMERSIA_PG_BIN=/usr/lib/postgresql/16/bin" >> "$GITHUB_ENV"
+
       - name: Créer les rôles et la base PostgreSQL
         working-directory: .
         env:
