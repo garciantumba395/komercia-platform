@@ -42,7 +42,7 @@ def run(calls):
 
 
 def test_js_files_are_syntactically_valid():
-    for name in ("app.js", "pages.js", "pos.js"):
+    for name in ("app.js", "pages.js", "pos.js", "billing.js"):
         subprocess.run([NODE, "--check", str(STATIC / name)], check=True, capture_output=True, timeout=30)
 
 

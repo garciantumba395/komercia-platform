@@ -93,7 +93,23 @@
     }
 
     /* ----- 2. Session de caisse ----- */
+    /** Message d'abonnement terminé, adapté au rôle (seul le propriétaire peut s'abonner). */
+    const roText = () => (ctx.role === 'owner'
+      ? 'Abonnement terminé : l’encaissement est désactivé. Abonnez-vous pour reprendre les ventes.' : K.billing.INACTIVE_MESSAGE);
+
+    /** Abonnement en lecture seule : pas de nouvelle vente (le serveur la refuserait de toute façon, code 402). */
+    function renderReadOnly() {
+      clear(view).append(h('section', { class: 'card ro-card' },
+        K.alertBox(roText(), 'error'),
+        h('p', null, 'Vos données sont conservées. Les ventes déjà faites restent consultables et leurs reçus imprimables depuis « Ventes du jour ».'),
+        h('div', { class: 'btn-row', style: 'justify-content:center' },
+          h('a', { class: 'btn', href: '/app/ventes/' }, 'Voir les ventes du jour'),
+          ctx.role === 'owner' ? h('a', { class: 'btn btn-secondary', href: '/app/abonnement/' }, 'S’abonner') : null)));
+      return null;
+    }
+
     async function checkSession() {
+      if (K.billing.isReadOnly()) return renderReadOnly();
       clear(view).appendChild(h('p', null, 'Chargement de la caisse…'));
       try {
         S.session = await currentSession();
@@ -461,11 +477,13 @@
           cls += ' exact';
           text = 'Montant exact reçu.';
         }
+        if (K.billing.isReadOnly()) { ok = false; cls = 'pay-summary remaining'; text = roText(); }
         paySummary.className = cls;
         paySummary.textContent = text;
         changeWrap.hidden = !(c.over > 0 && !credit);
         payBtn.disabled = !ok || S.submitting;
         payBtn.textContent = credit ? 'Enregistrer la vente à crédit' : 'Encaisser ' + (c.total ? fmt(c.total, S.currency) : '');
+        if (K.billing.isReadOnly()) payBtn.textContent = 'Encaissement indisponible';
         exactCdf.hidden = false;
       }
 
