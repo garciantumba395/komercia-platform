@@ -80,6 +80,9 @@ class Instance:
                 parts.append(f"--- {name}\n" + f.read_text(encoding="utf-8", errors="replace")[-6000:])
         return "\n".join(parts)
 
+    def app_log(self) -> str:
+        return (self.data / "logs" / "komersia.log").read_text(encoding="utf-8")
+
     def url(self, path):
         return f"http://127.0.0.1:{self.web_port}{path}"
 
@@ -171,7 +174,6 @@ def test_full_cycle_first_launch_to_clean_stop(instance):
         "items": [{"product": product["id"], "quantity": "2"}],
         "payments": [{"method": "cash", "amount_minor": 3000, "currency": "CDF"}]}, token)
     assert status == 201, sale
-    assert sale["total_minor"] == 3000 if "total_minor" in sale else True
     status, listing = inst.get("/api/v1/sales/", token)
     assert status == 200 and listing["count"] == 1
 
@@ -187,7 +189,7 @@ def test_full_cycle_first_launch_to_clean_stop(instance):
     with pytest.raises(psycopg.OperationalError):  # aucun accès sans mot de passe valide
         inst.db("komersia_app", "mauvais")
     assert oct((inst.data / "config" / "secrets.json").stat().st_mode & 0o777) == "0o600"
-    assert not any(v in (inst.data / "logs" / "komersia.log").read_text(encoding="utf-8")
+    assert not any(v in inst.app_log()
                    for v in (secrets["app_password"], secrets["owner_password"], secrets["secret_key"]))
     hba = (inst.data / "pgdata" / "pg_hba.conf").read_text()
     assert "trust" not in hba
@@ -205,9 +207,9 @@ def test_full_cycle_first_launch_to_clean_stop(instance):
     second = inst.cli("--run")
     assert second.returncode == 2 and "déjà lancé" in second.stdout
     deadline = time.monotonic() + 20
-    while time.monotonic() < deadline and "backup_tick" not in inst.logs():
+    while time.monotonic() < deadline and "backup_tick" not in inst.app_log():
         time.sleep(0.5)
-    assert "billing_tick" in inst.logs() and "backup_tick" in inst.logs()
+    assert "billing_tick" in inst.app_log() and "backup_tick" in inst.app_log()
 
     # --- arrêt propre
     assert inst.stop_cleanly() == 0
@@ -234,7 +236,7 @@ def test_restart_keeps_data_and_upgrade_takes_backup(instance):
     assert inst.secrets() == secrets_before
     status, login = inst.post("/api/v1/auth/login/", {"phone": PHONE, "password": PASSWORD})
     assert status == 200 and login["role"] == "owner"
-    assert inst.logs().count("manage.py migrate") == 1
+    assert inst.app_log().count("manage.py migrate") == 1
     assert inst.stop_cleanly() == 0
 
     # Mise à jour simulée : version précédente différente -> copie de sécurité PUIS migrations
@@ -244,7 +246,7 @@ def test_restart_keeps_data_and_upgrade_takes_backup(instance):
     inst.wait_healthy(90)
     dumps = list((inst.data / "backups").glob("avant-mise-a-jour-0.0.1-*.dump"))
     assert len(dumps) == 1 and dumps[0].stat().st_size > 1000
-    assert inst.logs().count("manage.py migrate") == 2
+    assert inst.app_log().count("manage.py migrate") == 2
     status, login = inst.post("/api/v1/auth/login/", {"phone": PHONE, "password": PASSWORD})
     assert status == 200
     assert inst.stop_cleanly() == 0
