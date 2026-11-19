@@ -8,6 +8,7 @@ from komersia_desktop.paths import Paths
 
 class FakePg:
     port = 5555
+    secrets = None
 
     def __init__(self, fail=False):
         self.dumps, self.fail = [], fail

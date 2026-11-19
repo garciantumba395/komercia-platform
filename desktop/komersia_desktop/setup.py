@@ -49,7 +49,7 @@ def backend_dir() -> Path:
     return Path(__file__).resolve().parents[2] / "backend"
 
 
-def django_env(paths: Paths, *, role: str, pg_port: int,
+def django_env(paths: Paths, *, role: str, pg_port: int, secrets: Secrets | None = None,
                base: dict[str, str] | None = None) -> dict[str, str]:
     env = dict(os.environ if base is None else base)
     env.update({
@@ -60,6 +60,13 @@ def django_env(paths: Paths, *, role: str, pg_port: int,
         "KOMERSIA_DB_PORT": str(pg_port),
         "KOMERSIA_DB_ROLE": role,
     })
+    if secrets is not None:
+        # Application `backups` : pg_dump exige un rôle BYPASSRLS (komersia_backup, lecture seule) ; la
+        # restauration, avec le propriétaire des tables (komersia_owner), jamais avec le rôle applicatif.
+        env.update({
+            "DB_BACKUP_USER": "komersia_backup", "DB_BACKUP_PASSWORD": secrets.backup_password,
+            "DB_RESTORE_USER": "komersia_owner", "DB_RESTORE_PASSWORD": secrets.owner_password,
+        })
     if not getattr(sys, "frozen", False):
         desktop = Path(__file__).resolve().parents[1]
         extra = os.pathsep.join([str(desktop), str(backend_dir())])
@@ -74,11 +81,12 @@ def manage_argv(args: list[str]) -> list[str]:
     return [sys.executable, "-m", "komersia_desktop.main", "--manage", *args]
 
 
-def run_manage(paths: Paths, args: list[str], *, role: str, pg_port: int,
+def run_manage(paths: Paths, args: list[str], *, role: str, pg_port: int, secrets: Secrets | None = None,
                timeout: float = 1800) -> subprocess.CompletedProcess:
     flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0  # type: ignore[attr-defined]
     log.info("manage.py %s (rôle %s)", " ".join(args), role)
-    proc = subprocess.run(manage_argv(args), env=django_env(paths, role=role, pg_port=pg_port),
+    env = django_env(paths, role=role, pg_port=pg_port, secrets=secrets)
+    proc = subprocess.run(manage_argv(args), env=env,
                           capture_output=True, text=True, timeout=timeout, stdin=subprocess.DEVNULL,
                           creationflags=flags)
     for line in (proc.stdout or "").splitlines():
@@ -97,8 +105,8 @@ def needs_update(paths: Paths, version: str = __version__) -> tuple[bool, str | 
     return (previous != version or forced or static_missing), previous
 
 
-def prune_upgrade_dumps(backups_dir: Path, keep: int = KEEP_UPGRADE_DUMPS) -> None:
-    dumps = sorted(backups_dir.glob("avant-mise-a-jour-*.dump"), key=lambda p: p.stat().st_mtime,
+def prune_upgrade_dumps(safety_dir: Path, keep: int = KEEP_UPGRADE_DUMPS) -> None:
+    dumps = sorted(safety_dir.glob("avant-mise-a-jour-*.dump"), key=lambda p: p.stat().st_mtime,
                    reverse=True)
     for old in dumps[keep:]:
         old.unlink(missing_ok=True)
@@ -116,17 +124,18 @@ def apply_updates(paths: Paths, pg: EmbeddedPostgres, *, version: str = __versio
         return False
     if previous is not None and previous != version:
         try:
-            target = paths.backups_dir / pre_upgrade_dump_name(previous, now)
+            target = paths.safety_dir / pre_upgrade_dump_name(previous, now)
             pg.dump_database(target)
             os.chmod(target, 0o600)
-            prune_upgrade_dumps(paths.backups_dir)
+            prune_upgrade_dumps(paths.safety_dir)
             log.info("Copie de sécurité avant mise à jour : %s", target)
         except Exception:
             # On ne migre PAS sans filet : mieux vaut un démarrage refusé qu'une base abîmée.
             log.exception("Copie de sécurité avant mise à jour impossible : migration annulée.")
             raise
-    manage(paths, ["migrate", "--noinput"], role="owner", pg_port=pg.port)
-    manage(paths, ["collectstatic", "--noinput", "--clear"], role="owner", pg_port=pg.port)
+    manage(paths, ["migrate", "--noinput"], role="owner", pg_port=pg.port, secrets=pg.secrets)
+    manage(paths, ["collectstatic", "--noinput", "--clear"], role="owner", pg_port=pg.port,
+           secrets=pg.secrets)
     config.write_state(paths, {"version": version,
                                "applied_at": (now or datetime.now(UTC)).isoformat(timespec="seconds")})
     return True

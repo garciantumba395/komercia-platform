@@ -99,8 +99,11 @@ class Instance:
             req.add_header("Authorization", f"Token {token}")
         return self._open(req)
 
-    def post(self, path, body, token=None):
-        req = urllib.request.Request(self.url(path), data=json.dumps(body).encode(), method="POST",
+    def put(self, path, body, token=None):
+        return self.post(path, body, token, method="PUT")
+
+    def post(self, path, body, token=None, method="POST"):
+        req = urllib.request.Request(self.url(path), data=json.dumps(body).encode(), method=method,
                                      headers={"Content-Type": "application/json"})
         if token:
             req.add_header("Authorization", f"Token {token}")
@@ -251,7 +254,7 @@ def test_restart_keeps_data_and_upgrade_takes_backup(instance):
     state.write_text(json.dumps({"version": "0.0.1"}), encoding="utf-8")
     inst.start()
     inst.wait_healthy(90)
-    dumps = list((inst.data / "backups").glob("avant-mise-a-jour-0.0.1-*.dump"))
+    dumps = list((inst.data / "securite").glob("avant-mise-a-jour-0.0.1-*.dump"))
     assert len(dumps) == 1 and dumps[0].stat().st_size > 1000
     assert inst.app_log().count("manage.py migrate") == 2
     status, login = inst.post("/api/v1/auth/login/", {"phone": PHONE, "password": PASSWORD})
@@ -281,3 +284,58 @@ def test_cli_version_and_selftest(instance):
     assert instance.cli("--version").stdout.strip()
     r = instance.cli("--selftest")
     assert r.returncode == 0 and "AUTO-TEST OK" in r.stdout, r.stdout + r.stderr
+
+
+def test_backup_then_restore_through_the_launcher(instance, tmp_path):
+    """Application `backups` : sauvegarde (rôle komersia_backup, BYPASSRLS) puis « Restaurer une sauvegarde »
+    (arrêt du web, restore_backup avec le propriétaire, migrations, relance) sans perdre le service."""
+    inst = instance
+    inst.start()
+    inst.wait_healthy()
+    status, reg = inst.post("/api/v1/auth/register/", {
+        "full_name": "Marie Test", "phone": PHONE, "password": PASSWORD, "business_name": "Boutique Marie"})
+    assert status == 201, reg
+    token, store = reg["token"], reg["store"]["id"]
+    _, product = inst.post("/api/v1/catalog/products/", {
+        "name": "Savon", "sku": "SAV-001", "price_minor": 1500, "currency": "CDF", "track_stock": False}, token)
+
+    def sell():
+        status, sale = inst.post("/api/v1/sales/", {
+            "client_id": str(uuid.uuid4()), "store": store, "items": [{"product": product["id"], "quantity": "1"}],
+            "payments": [{"method": "cash", "amount_minor": 1500, "currency": "CDF"}]}, token)
+        assert status == 201, sale
+
+    def count():
+        return inst.get("/api/v1/sales/", token)[1]["count"]
+
+    sell()
+    # Aucun dossier par défaut dans les données : l'API refuse le dossier des données, accepte un autre
+    target = Path(tempfile.mkdtemp(prefix="komersia-usb-", dir="/var/tmp"))
+    try:
+        status, refused = inst.put("/api/v1/backups/settings/", {"folder": str(inst.data / "securite")}, token)
+        assert status == 400, refused
+        status, ok = inst.put("/api/v1/backups/settings/", {"folder": str(target)}, token)
+        assert status == 200, ok
+        status, run = inst.post("/api/v1/backups/run/", {}, token)
+        assert status == 201 and run["ok"], run
+        dumps = list(target.glob("komersia-*.dump"))
+        assert len(dumps) == 1 and dumps[0].stat().st_size > 1000
+        sell()
+        assert count() == 2
+
+        r = inst.cli("--restore", str(dumps[0]), "--check-only")
+        assert r.returncode == 0, r.stdout + r.stderr
+        r = inst.cli("--restore", str(dumps[0]))
+        assert r.returncode == 0, r.stdout + r.stderr + inst.logs()
+        assert "Restauration terminée" in r.stdout
+        inst.wait_healthy(60)
+        assert count() == 1  # retour à l'état de la sauvegarde
+        assert list((inst.data / "securite").glob("komersia-avant-restauration-*.dump")) or \
+            list(target.glob("komersia-avant-restauration-*.dump"))
+        sell()  # le rôle applicatif fonctionne toujours après la restauration (droits rétablis, RLS active)
+        assert count() == 2
+        assert inst.cli("--restore", "/nexiste/pas.dump").returncode == 1
+        inst.wait_healthy(10)  # une restauration refusée ne coupe pas le service
+        assert inst.stop_cleanly() == 0
+    finally:
+        shutil.rmtree(target, ignore_errors=True)

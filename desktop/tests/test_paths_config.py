@@ -34,7 +34,7 @@ def test_settings_local_resolves_same_data_dir(tmp_path):
 def test_paths_layout(tmp_path):
     p = make_paths(tmp_path)
     p.ensure_dirs()
-    for d in (p.config_dir, p.logs_dir, p.backups_dir, p.control_dir):
+    for d in (p.config_dir, p.logs_dir, p.safety_dir, p.control_dir):
         assert d.is_dir() and d.parent == p.data_dir
     assert p.pgdata_dir.parent == p.data_dir and p.secrets_file.parent == p.config_dir
 

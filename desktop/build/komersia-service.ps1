@@ -47,7 +47,7 @@ function Read-Settings {
 
 function Install-Komersia {
     if (-not (Test-Path $Exe)) { throw "KomersiaServer.exe introuvable : $Exe" }
-    foreach ($d in @('', 'config', 'logs', 'backups', 'control')) {
+    foreach ($d in @('', 'config', 'logs', 'securite', 'control')) {
         New-Item -ItemType Directory -Force -Path (Join-Path $DataDir $d) | Out-Null
     }
     Write-Step 'Droits sur le dossier de données'
@@ -55,8 +55,8 @@ function Install-Komersia {
     Invoke-Icacls @($DataDir, '/grant', "${SidNetworkService}:(OI)(CI)M")
     # `control` : seul dossier modifiable par les utilisateurs standard (demande d'arrêt, verrou).
     Invoke-Icacls @((Join-Path $DataDir 'control'), '/grant', "${SidUsers}:(OI)(CI)M")
-    # Sauvegardes : service, SYSTEM et administrateurs seulement (elles contiennent toutes les données).
-    $backups = Join-Path $DataDir 'backups'
+    # Copies de sécurité internes : service, SYSTEM et administrateurs seulement (elles contiennent toutes les données).
+    $backups = Join-Path $DataDir 'securite'
     Invoke-Icacls @($backups, '/inheritance:r', '/grant:r', "${SidNetworkService}:(OI)(CI)F",
         '/grant:r', "${SidSystem}:(OI)(CI)F", '/grant:r', "${SidAdmins}:(OI)(CI)F")
 
@@ -131,7 +131,7 @@ function Uninstall-Komersia {
 function Remove-Data {
     if (-not (Test-Path $DataDir)) { return }
     Write-Step "Suppression des données : $DataDir"
-    # pgdata et backups sont réservés au service : l'administrateur en reprend d'abord la propriété.
+    # pgdata et securite sont réservés au service : l'administrateur en reprend d'abord la propriété.
     & takeown.exe /F $DataDir /R /D O | Out-Null
     Invoke-Icacls @($DataDir, '/grant', "${SidAdmins}:(OI)(CI)F", '/T', '/C', '/Q')
     Remove-Item -Recurse -Force $DataDir

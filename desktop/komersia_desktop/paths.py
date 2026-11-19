@@ -82,8 +82,11 @@ class Paths:
         return self.data_dir / "logs"
 
     @property
-    def backups_dir(self) -> Path:
-        return self.data_dir / "backups"
+    def safety_dir(self) -> Path:
+        """Copies de sécurité INTERNES (avant mise à jour, avant restauration). Les sauvegardes de
+        l'utilisateur (application `backups`) vont ailleurs : disque ou clé USB, jamais dans le dossier des
+        données (l'API les refuse)."""
+        return self.data_dir / "securite"
 
     @property
     def static_root(self) -> Path:
@@ -105,6 +108,14 @@ class Paths:
         return self.control_dir / "stop.request"
 
     @property
+    def restore_request(self) -> Path:
+        return self.control_dir / "restore.request"
+
+    @property
+    def restore_result(self) -> Path:
+        return self.control_dir / "restore.result"
+
+    @property
     def address_file(self) -> Path:
         return self.data_dir / "ADRESSE.txt"
 
@@ -113,5 +124,5 @@ class Paths:
         return self.data_dir / "pycache"
 
     def ensure_dirs(self) -> None:
-        for d in (self.data_dir, self.config_dir, self.logs_dir, self.backups_dir, self.control_dir):
+        for d in (self.data_dir, self.config_dir, self.logs_dir, self.safety_dir, self.control_dir):
             d.mkdir(parents=True, exist_ok=True)

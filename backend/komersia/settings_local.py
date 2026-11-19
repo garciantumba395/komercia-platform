@@ -43,7 +43,6 @@ def _load_json(path: Path) -> dict:
 KOMERSIA_DATA_DIR = _default_data_dir()
 KOMERSIA_CONFIG_DIR = KOMERSIA_DATA_DIR / "config"
 KOMERSIA_LOG_DIR = KOMERSIA_DATA_DIR / "logs"
-KOMERSIA_BACKUP_DIR = KOMERSIA_DATA_DIR / "backups"
 KOMERSIA_PG_BIN_DIR = os.environ.get("KOMERSIA_PG_BIN") or str(
     Path(os.environ.get("KOMERSIA_INSTALL_DIR", ".")) / "pgsql" / "bin"
 )
@@ -103,14 +102,9 @@ DATABASES = {
 }
 # L'alias « ops » (rôle komersia_ops, BYPASSRLS) n'existe pas en local : supprimé ci-dessus.
 
-# Informations pour la sauvegarde automatique (rôle de lecture seule BYPASSRLS, créé par le lanceur).
-KOMERSIA_BACKUP_DATABASE = {
-    "HOST": "127.0.0.1",
-    "PORT": str(_PG_PORT),
-    "NAME": _DB_NAME,
-    "USER": "komersia_backup",
-    "PASSWORD": _secrets_file.get("backup_password", ""),
-}
+# Sauvegardes (application `backups`) : le lanceur fournit les variables d'environnement DB_BACKUP_USER/PASSWORD
+# (rôle komersia_backup, BYPASSRLS) et DB_RESTORE_USER/PASSWORD (komersia_owner). Aucun dossier de sauvegarde
+# par défaut : il doit être choisi hors du dossier des données et de l'installation (disque ou clé USB).
 
 # --- Fichiers statiques (servis par WhiteNoise) ---
 STATIC_ROOT = KOMERSIA_DATA_DIR / "static"

@@ -5,6 +5,7 @@
     KomersiaServer --status    état, ports, adresses réseau
     KomersiaServer --init      premier lancement seulement (secrets, base, migrations), puis arrêt
     KomersiaServer --open      ouvre le navigateur sur http://localhost:<port>/app/
+    KomersiaServer --restore F restaure la sauvegarde F (.dump) ; --check-only : vérifie seulement
     KomersiaServer --version
 """
 
@@ -53,6 +54,11 @@ class KomersiaServer:
         self.paths = paths or Paths.from_env()
         self.pg_run_as = pg_run_as or os.environ.get("KOMERSIA_PG_RUN_AS") or None  # tests Linux en root
         self.stop_event = threading.Event()
+        self.prepared: setup.Prepared | None = None
+        self.pg: EmbeddedPostgres | None = None
+        self.server: WebServer | None = None
+        self.scheduler: Scheduler | None = None
+        self.web_port = 0
 
     # ------------------------------------------------------------------------------------------------ run
     def _install_signal_handlers(self) -> None:
@@ -102,6 +108,17 @@ class KomersiaServer:
         finally:
             lock.release()
 
+    def _start_web(self) -> None:
+        st = self.prepared.settings
+        self.server = WebServer(st.bind, self.web_port, threads=st.threads)
+        self.server.start()
+
+    def _start_scheduler(self) -> None:
+        if os.environ.get("KOMERSIA_SCHEDULER", "1") == "0":
+            return
+        self.scheduler = Scheduler(initial_delay=float(os.environ.get("KOMERSIA_SCHEDULER_DELAY", "60")))
+        self.scheduler.start()
+
     def run(self) -> int:
         paths = self.paths
         paths.ensure_dirs()
@@ -113,65 +130,66 @@ class KomersiaServer:
             return EXIT_ALREADY_RUNNING
         configure_logging(paths.logs_dir, console=sys.stderr is not None and sys.stderr.isatty())
         log.info("Komersia %s : démarrage (données : %s)", __version__, paths.data_dir)
-        pg = server = scheduler = None
         code = EXIT_OK
         try:
             self._install_signal_handlers()
-            paths.stop_request.unlink(missing_ok=True)  # demande d'arrêt périmée
-            prepared = setup.prepare(paths)
-            st = prepared.settings
-            if prepared.first_run:
+            paths.stop_request.unlink(missing_ok=True)  # demandes périmées
+            paths.restore_request.unlink(missing_ok=True)
+            self.prepared = setup.prepare(paths)
+            st = self.prepared.settings
+            if self.prepared.first_run:
                 log.info("Premier lancement : secrets générés, création de la base (environ une minute)")
-            pg, pg_port = self._bring_up_database(prepared, stop_after=False)
-            web_port = choose_port(st.web_port, st.bind, attempts=WEB_PORT_ATTEMPTS)
-            if web_port != st.web_port:
-                log.warning("Port web %s occupé : utilisation de %s", st.web_port, web_port)
-            os.environ.update(setup.django_env(paths, role="app", pg_port=pg_port))
+            self.pg, pg_port = self._bring_up_database(self.prepared, stop_after=False)
+            self.web_port = choose_port(st.web_port, st.bind, attempts=WEB_PORT_ATTEMPTS)
+            if self.web_port != st.web_port:
+                log.warning("Port web %s occupé : utilisation de %s", st.web_port, self.web_port)
+            os.environ.update(setup.django_env(paths, role="app", pg_port=pg_port,
+                                               secrets=self.prepared.secrets))
             add_backend_to_path()
             import django
 
             django.setup()
-            server = WebServer(st.bind, web_port, threads=st.threads)
-            server.start()
+            self._start_web()
             config.write_runtime(paths, config.Runtime(
-                pid=os.getpid(), web_port=web_port, pg_port=pg_port, bind=st.bind, version=__version__,
+                pid=os.getpid(), web_port=self.web_port, pg_port=pg_port, bind=st.bind, version=__version__,
                 started_at=datetime.now(UTC).isoformat(timespec="seconds")))
-            network.write_address_file(paths.address_file, web_port, st.bind)
-            if os.environ.get("KOMERSIA_SCHEDULER", "1") != "0":
-                scheduler = Scheduler(initial_delay=float(os.environ.get("KOMERSIA_SCHEDULER_DELAY", "60")))
-                scheduler.start()
-            log.info("Komersia prêt : http://localhost:%s/app/", web_port)
-            code = self._supervise(pg, server)
+            network.write_address_file(paths.address_file, self.web_port, st.bind)
+            self._start_scheduler()
+            log.info("Komersia prêt : http://localhost:%s/app/", self.web_port)
+            code = self._supervise()
         except Exception:
             log.exception("Erreur fatale au démarrage ou à l'exécution")
             code = EXIT_ERROR
         finally:
             log.info("Arrêt en cours")
-            if scheduler:
-                scheduler.stop()
-            if server:
-                server.stop()
-            if pg:
+            if self.scheduler:
+                self.scheduler.stop()
+            if self.server:
+                self.server.stop()
+            if self.pg:
                 try:
-                    pg.stop()
+                    self.pg.stop()
                 except Exception:
                     log.exception("Arrêt de PostgreSQL en échec : arrêt de secours")
-                    pg.emergency_stop()
+                    self.pg.emergency_stop()
             paths.runtime_file.unlink(missing_ok=True)
             paths.stop_request.unlink(missing_ok=True)
             log.info("Komersia arrêté")
             lock.release()
         return code
 
-    def _supervise(self, pg: EmbeddedPostgres, server: WebServer, poll: float = 1.0) -> int:
+    def _supervise(self, poll: float = 1.0) -> int:
         """Boucle principale : attend l'arrêt ; surveille serveur web et PostgreSQL (relance 1 fois)."""
+        pg = self.pg
         last_pg_check = time.monotonic()
         pg_restarts = 0
         while not self.stop_event.wait(poll):
             if self.paths.stop_request.exists():
                 log.info("Demande d'arrêt reçue (%s)", self.paths.stop_request)
                 return EXIT_OK
-            if not server.is_alive():
+            if self.paths.restore_request.exists():
+                self.handle_restore_request()
+            if not self.server.is_alive():
                 log.error("Le serveur web s'est arrêté : sortie (le planificateur Windows relancera).")
                 return EXIT_ERROR
             if time.monotonic() - last_pg_check >= 30:
@@ -184,6 +202,88 @@ class KomersiaServer:
                     log.error("PostgreSQL s'est arrêté : tentative de redémarrage")
                     pg.start()
         return EXIT_OK
+
+    # ----------------------------------------------------------------------------------- restauration
+    def handle_restore_request(self) -> None:
+        """« Restaurer une sauvegarde » : arrête le serveur web, restaure, migre, relance le serveur web.
+
+        L'application doit être arrêtée pendant la restauration (elle remplace TOUTES les données) ;
+        PostgreSQL reste lancé (c'est lui qui reçoit la restauration).
+        Le résultat est écrit dans control/restore.result.
+        """
+        paths = self.paths
+        ok, message = False, ""
+        try:
+            req = json.loads(paths.restore_request.read_text(encoding="utf-8-sig"))
+            file, check_only = str(req["file"]), bool(req.get("check_only"))
+        except (OSError, ValueError, KeyError) as exc:
+            paths.restore_request.unlink(missing_ok=True)
+            self._write_restore_result(False, f"Demande de restauration illisible : {exc}")
+            return
+        paths.restore_request.unlink(missing_ok=True)
+        log.warning("Restauration demandée : %s%s", file, " (vérification seulement)" if check_only else "")
+        try:
+            args = ["restore_backup", file]
+            if check_only:
+                args.append("--check-only")
+            else:
+                args += ["--yes", "--safety-dir", str(paths.safety_dir)]
+                self.scheduler and self.scheduler.stop()
+                self.scheduler = None
+                self.server.stop()
+                from django.db import connections
+
+                connections.close_all()
+            proc = setup.run_manage(paths, args, role="owner", pg_port=self.pg.port,
+                                    secrets=self.prepared.secrets)
+            message = (proc.stdout or "").strip()
+            if not check_only:
+                # Sauvegarde plus ancienne que l'application : remise à niveau du schéma.
+                setup.run_manage(paths, ["migrate", "--noinput"], role="owner", pg_port=self.pg.port,
+                                 secrets=self.prepared.secrets)
+                self.pg.ensure_roles_and_database()  # rétablit les droits du rôle applicatif
+            ok = True
+        except Exception as exc:
+            log.exception("Restauration en échec")
+            message = str(exc)
+        finally:
+            if not check_only and (self.server is None or not self.server.is_alive()):
+                try:
+                    self._start_web()
+                    self._start_scheduler()
+                except Exception:
+                    log.exception("Impossible de relancer le serveur web après la restauration")
+        self._write_restore_result(ok, message)
+
+    def _write_restore_result(self, ok: bool, message: str) -> None:
+        self.paths.restore_result.write_text(
+            json.dumps({"ok": ok, "message": message[-4000:]}, ensure_ascii=False), encoding="utf-8")
+
+    def request_restore(self, file: str, *, check_only: bool = False, timeout: float = 900) -> int:
+        """Côté CLI : dépose la demande, attend le résultat de l'instance en cours."""
+        if not is_locked(self.paths.lock_file):
+            print("Komersia n'est pas lancé : démarrez-le (« Démarrer Komersia »), puis recommencez.")
+            return EXIT_NOT_RUNNING
+        if not os.path.isabs(file):
+            file = os.path.abspath(file)
+        self.paths.control_dir.mkdir(parents=True, exist_ok=True)
+        self.paths.restore_result.unlink(missing_ok=True)
+        self.paths.restore_request.write_text(json.dumps({"file": file, "check_only": check_only}),
+                                              encoding="utf-8")
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self.paths.restore_result.exists():
+                try:
+                    res = json.loads(self.paths.restore_result.read_text(encoding="utf-8-sig"))
+                except ValueError:
+                    time.sleep(0.2)
+                    continue
+                self.paths.restore_result.unlink(missing_ok=True)
+                print(res["message"] or ("Terminé." if res["ok"] else "Échec."))
+                return EXIT_OK if res["ok"] else EXIT_ERROR
+            time.sleep(0.5)
+        print("La restauration n'a pas répondu dans le délai imparti.")
+        return EXIT_ERROR
 
     # ------------------------------------------------------------------------------------- stop / status
     def stop_running(self, timeout: float = 90) -> int:
@@ -343,8 +443,11 @@ def build_parser() -> argparse.ArgumentParser:
     group.add_argument("--status", action="store_true", help="affiche l'état et les adresses")
     group.add_argument("--init", action="store_true", help="premier lancement seulement, puis arrêt")
     group.add_argument("--open", action="store_true", help="ouvre le navigateur sur l'application")
+    group.add_argument("--restore", metavar="FICHIER", 
+                       help="restaure une sauvegarde (.dump) : remplace TOUTES les données")
     group.add_argument("--version", action="store_true", help="affiche la version")
     group.add_argument("--selftest", action="store_true", help="vérifie l'installation (sans base)")
+    p.add_argument("--check-only", action="store_true", help="avec --restore : vérifie le fichier seulement")
     p.add_argument("--json", action="store_true", help="avec --status : sortie JSON")
     p.add_argument("--data-dir", help="dossier de données (défaut : %%PROGRAMDATA%%\\Komersia)")
     p.add_argument("--port", type=int, help="port du serveur web (défaut : 8000, repli si occupé)")
@@ -373,6 +476,8 @@ def main(argv: list[str] | None = None) -> int:
         platform_win.hide_console()
     if args.stop:
         return app.stop_running()
+    if args.restore:
+        return app.request_restore(args.restore, check_only=args.check_only)
     if args.status:
         return app.print_status(args.json)
     if args.open:

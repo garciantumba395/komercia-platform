@@ -138,7 +138,7 @@ Remove-Item Env:KOMERSIA_DATA_DIR, Env:KOMERSIA_PG_BIN
 Write-Step 'Assemblage'
 Copy-Item -Recurse $appDir (Join-Path $Stage 'app')
 New-Item -ItemType Directory -Force -Path (Join-Path $Stage 'scripts') | Out-Null
-Copy-Item (Join-Path $BuildDir 'komersia-service.ps1') (Join-Path $Stage 'scripts')
+foreach ($f in 'komersia-service.ps1', 'restaurer-sauvegarde.ps1') { Copy-Item (Join-Path $BuildDir $f) (Join-Path $Stage 'scripts') }
 Copy-Item (Join-Path $BuildDir 'LISEZMOI.txt') $Stage
 Write-Host ("Taille de l'installation : {0:N0} Mo" -f ((Get-ChildItem -Recurse $Stage | Measure-Object Length -Sum).Sum / 1MB))
 

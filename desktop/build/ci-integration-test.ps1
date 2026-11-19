@@ -155,6 +155,29 @@ try {
     $list = Invoke-Api 'GET' '/api/v1/sales/' $null $token
     Assert (($list.Status -eq 200) -and ($list.Json.count -eq 1)) 'La vente n''apparaît pas dans la liste'
 
+    Step '4b. Sauvegarde (application backups) puis restauration par le lanceur'
+    $bk = 'C:\KomersiaCiBackups'
+    New-Item -ItemType Directory -Force -Path $bk | Out-Null
+    $r = Invoke-Api 'PUT' '/api/v1/backups/settings/' @{ folder = $bk } $token
+    Assert ($r.Status -eq 200) "Réglage du dossier de sauvegarde : HTTP $($r.Status)"
+    $r = Invoke-Api 'POST' '/api/v1/backups/run/' @{} $token
+    Assert (($r.Status -eq 201) -and $r.Json.ok) "Sauvegarde immédiate : HTTP $($r.Status) $($r.Json.message)"
+    $dump = Get-ChildItem $bk -Filter 'komersia-*.dump' | Select-Object -First 1
+    Assert ($null -ne $dump) 'Aucun fichier de sauvegarde produit'
+    $sale2 = Invoke-Api 'POST' '/api/v1/sales/' @{
+        client_id = [guid]::NewGuid().ToString(); store = $storeId
+        items = @(@{ product = $prod.Json.id; quantity = '1' })
+        payments = @(@{ method = 'cash'; amount_minor = 1500; currency = 'CDF' }) } $token
+    Assert ($sale2.Status -eq 201) "2e vente : HTTP $($sale2.Status)"
+    & $exe --restore $dump.FullName --check-only
+    Assert ($LASTEXITCODE -eq 0) "--restore --check-only : code $LASTEXITCODE"
+    & $exe --restore $dump.FullName
+    Assert ($LASTEXITCODE -eq 0) "--restore : code $LASTEXITCODE"
+    Wait-Healthy 120
+    $list = Invoke-Api 'GET' '/api/v1/sales/' $null $token
+    Assert ($list.Json.count -eq 1) "Après restauration, 1 vente attendue (obtenu $($list.Json.count))"
+    Remove-Item -Recurse -Force $bk
+
     Step '5. PostgreSQL n''écoute QUE sur 127.0.0.1'
     $pgProcs = @(Get-Process -Name postgres -ErrorAction SilentlyContinue |
             Where-Object { $_.Path -and $_.Path.StartsWith("$InstallDir\", [StringComparison]::OrdinalIgnoreCase) })
