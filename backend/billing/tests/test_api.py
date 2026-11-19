@@ -8,7 +8,7 @@ from audit.models import AuditEntry
 from billing import services
 from billing.models import PaymentReference, Subscription, SubscriptionPayment
 from core.permissions import ACCOUNTANT, CASHIER, MANAGER, STOREKEEPER
-from core.tenancy import tenant_context
+from core.tenancy import activate_tenant, tenant_context
 
 from .helpers import (
     NOW,
@@ -118,7 +118,11 @@ def test_change_plan_api_upgrade_and_downgrade(tenant_a):
     add_stores(tenant_a, 1)
     r = client.post(f"{B}/change-plan/", {"plan": "essentiel"}, format="json")
     assert r.status_code == 400 and r.json()["code"] == "limits_exceeded"
-    assert client.post(f"{B}/change-plan/", {"plan": "pro"}, format="json").status_code == 400
+    r = client.post(f"{B}/change-plan/", {"plan": "pro"}, format="json")  # rester sur le plan actuel
+    assert r.status_code == 200 and r.json() == {"kind": "unchanged", "pending_plan": None,
+                                                 "effective_at": None}
+    r = client.post(f"{B}/change-plan/", {"plan": "pro"}, format="json")
+    assert r.status_code == 400 and r.json()["code"] == "same_plan"
 
 
 def test_cancel_and_resume_api(tenant_a):
@@ -275,7 +279,8 @@ def test_payment_reference_has_no_rls_and_leaks_nothing(tenant_a, tenant_b):
     ref = tenant_a.client().post(f"{B}/subscribe/", SUBSCRIBE, format="json").json()["payment"]["reference"]
     # lisible hors contexte de tenant (webhook) ...
     assert PaymentReference.objects.get(reference=ref).tenant_id == tenant_a.tenant.id
-    # ... alors que les tables métier sont invisibles sans contexte
+    # ... alors que les tables métier sont invisibles sans contexte de tenant
+    activate_tenant(None)
     assert Subscription.objects.count() == 0 and SubscriptionPayment.objects.count() == 0
     # la table ne contient que la référence opaque et le tenant : aucune donnée métier
     assert {f.name for f in PaymentReference._meta.get_fields()} == {"id", "reference", "tenant_id"}
