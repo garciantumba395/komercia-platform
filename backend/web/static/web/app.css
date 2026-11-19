@@ -343,3 +343,4 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 .notice-row { display: flex; flex-wrap: wrap; gap: .4rem .8rem; align-items: center; justify-content: space-between; padding: .5rem 0; border-bottom: 1px solid var(--line); }
 .notice-row:last-child { border-bottom: 0; }
 .ro-card { text-align: center; }
+.pay-box, .waiting, #plans-title, .abo-status { scroll-margin-top: 72px; }

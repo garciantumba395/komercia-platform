@@ -157,9 +157,11 @@
         }
         return card;
       });
-      clear(el.plans).append(
-        h('div', { class: 'plans' }, cards),
-        noRate ? h('p', { class: 'hint' }, 'Taux de change non défini : les estimations en francs sont indisponibles. ', h('a', { href: '/app/taux/' }, 'Définir le taux dans la page Taux de change'), ' ou payez en dollars.') : null);
+      clear(el.plans).appendChild(h('div', { class: 'plans' }, cards));
+      if (noRate) {
+        el.plans.appendChild(h('p', { class: 'hint' }, 'Taux de change non défini : les estimations en francs sont indisponibles. ',
+          h('a', { href: '/app/taux/' }, 'Définir le taux dans la page Taux de change'), ' ou payez en dollars.'));
+      }
     }
 
     function selectPlan(code) {

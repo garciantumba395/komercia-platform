@@ -48,7 +48,6 @@ def ops_role_ready(django_db_setup, django_db_blocker):
                     ).as_string(cursor.connection)
                 )
             except Exception:
-                connection.rollback() if not connection.in_atomic_block else None
                 if not _create_role_as_superuser(role, password):
                     pytest.fail(
                         f"Le rôle PostgreSQL « {role} » n'existe pas et ne peut pas être créé par le rôle propriétaire "
