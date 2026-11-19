@@ -8,7 +8,7 @@ from django.core.paginator import Paginator
 from django.http import Http404, HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_http_methods, require_POST, require_safe
 
 from . import access, metrics, platform_audit as pa, queries, services
 from .flags import KNOWN_FLAGS
@@ -48,11 +48,13 @@ def logout_view(request):
     return redirect(access.LOGIN_URL)
 
 
+@require_safe
 @access.ops_required
 def dashboard(request):
     return render(request, "backoffice/dashboard.html", {"m": metrics.platform_metrics()})
 
 
+@require_safe
 @access.ops_required
 def tenant_list(request):
     search = request.GET.get("q", "")
@@ -75,6 +77,7 @@ def _tenant_or_404(tenant_id):
     return overview
 
 
+@require_safe
 @access.ops_required
 def tenant_detail(request, tenant_id: uuid.UUID):
     overview = _tenant_or_404(tenant_id)
@@ -83,6 +86,7 @@ def tenant_detail(request, tenant_id: uuid.UUID):
     return render(request, "backoffice/tenant_detail.html", {**overview, "grant": grant, "flag_rows": flags})
 
 
+@require_http_methods(["GET", "POST"])
 @access.ops_required
 def tenant_toggle(request, tenant_id: uuid.UUID, action: str):
     """GET : page de confirmation avec motif ; POST : applique (motif et confirmation obligatoires)."""
@@ -127,6 +131,7 @@ SUPPORT_PAGES = {
 }
 
 
+@require_safe
 @access.ops_required
 def support_data(request, tenant_id: uuid.UUID, kind: str):
     """Données détaillées d'une entreprise : LECTURE SEULE, avec consentement valide, chaque consultation journalisée."""

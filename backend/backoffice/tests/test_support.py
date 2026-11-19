@@ -138,7 +138,7 @@ def test_with_consent_agent_reads_and_every_view_is_audited(tenant_a):
     assert [e.after["page"] for e in entries] == ["sales", "products", "customers"]
     assert all(e.user_id == agent.id and e.entity_id == str(tenant_a.tenant.id) for e in entries)
     # Le propriétaire voit ces consultations dans son propre journal d'audit (API).
-    audit_api = tenant_a.client().get("/api/v1/audit/").json()
+    audit_api = tenant_a.client().get("/api/v1/audit/entries/?action=platform.support_view").json()
     results = audit_api["results"] if isinstance(audit_api, dict) else audit_api
     assert any(r["action"] == "platform.support_view" for r in results)
 

@@ -29,7 +29,7 @@ def test_owner_flag(monkeypatch):
 
 
 def test_password_is_never_an_argument():
-    with pytest.raises(SystemExit):
+    with pytest.raises(CommandError):
         call_command("create_platform_admin", "--phone", "+243810000102", "--name", "X", "--password", "abc")
 
 

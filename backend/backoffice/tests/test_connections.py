@@ -25,7 +25,7 @@ def test_merchant_api_never_uses_ops_alias(tenant_a):
     api = tenant_a.client()
     with connections["ops"].execute_wrapper(_forbid_ops):
         for url in ("/api/v1/auth/me/", "/api/v1/sales/", "/api/v1/catalog/products/", "/api/v1/customers/",
-                    "/api/v1/billing/subscription/", "/api/v1/audit/", "/api/v1/support/"):
+                    "/api/v1/billing/subscription/", "/api/v1/audit/entries/", "/api/v1/support/"):
             response = api.get(url)
             assert response.status_code in (200, 403, 404), (url, response.status_code)
         api.post("/api/v1/support/grant/", {"hours": 2}, format="json")

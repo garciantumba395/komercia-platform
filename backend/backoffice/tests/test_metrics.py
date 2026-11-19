@@ -25,6 +25,11 @@ def _sub(handle, **fields):
         return sub
 
 
+def _get_sub(handle):
+    with tenant_context(handle.tenant.id):
+        return Subscription.objects.get()
+
+
 def _payment(handle, sub, status="confirmed", confirmed_at=None, created_at=None, plan_code="pro", suffix=""):
     with tenant_context(handle.tenant.id):
         plan = Plan.objects.get(code=plan_code)
@@ -85,8 +90,8 @@ def test_trial_conversion_over_finished_trials():
     a, b, c, d = _make(4)
     for handle, ended in ((a, True), (b, True), (c, True), (d, False)):
         _sub(handle, trial_ends_at=NOW - DAY if ended else NOW + DAY)
-    _payment(a, Subscription.objects.get(tenant_id=a.tenant.id), confirmed_at=NOW - DAY)
-    _payment(b, Subscription.objects.get(tenant_id=b.tenant.id), status="failed")
+    _payment(a, _get_sub(a), confirmed_at=NOW - DAY)
+    _payment(b, _get_sub(b), status="failed")
     result = metrics.trial_conversion(NOW)
     assert result["ended_trials"] == 3 and result["converted"] == 1
     assert round(result["rate_pct"], 2) == 33.33
@@ -123,7 +128,7 @@ def test_sales_7_days_per_currency_without_mixing():
 
 def test_payment_success_rate():
     (a,) = _make(1)
-    sub = Subscription.objects.get(tenant_id=a.tenant.id)
+    sub = _get_sub(a)
     recent = NOW - 2 * DAY
     for status in ("confirmed", "confirmed", "confirmed", "failed"):
         _payment(a, sub, status=status, confirmed_at=recent if status == "confirmed" else None, created_at=recent)
