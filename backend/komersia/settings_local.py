@@ -102,7 +102,8 @@ DATABASES = {
 }
 # L'alias « ops » (rôle komersia_ops, BYPASSRLS) n'existe pas en local : supprimé ci-dessus.
 
-# Sauvegardes (application `backups`) : le lanceur fournit les variables d'environnement DB_BACKUP_USER/PASSWORD
+# Sauvegardes (application `backups`) : le lanceur fournit les variables d'environnement
+# DB_BACKUP_USER/PASSWORD
 # (rôle komersia_backup, BYPASSRLS) et DB_RESTORE_USER/PASSWORD (komersia_owner). Aucun dossier de sauvegarde
 # par défaut : il doit être choisi hors du dossier des données et de l'installation (disque ou clé USB).
 
