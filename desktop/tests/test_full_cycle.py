@@ -164,7 +164,7 @@ def test_full_cycle_first_launch_to_clean_stop(instance):
     assert status == 403 and again["code"] == "already_configured"  # une entreprise par installation
 
     status, product = inst.post("/api/v1/catalog/products/", {
-        "name": "Savon", "price_minor": 1500, "currency": "CDF", "track_stock": False}, token)
+        "name": "Savon", "sku": "SAV-001", "price_minor": 1500, "currency": "CDF", "track_stock": False}, token)
     assert status == 201, product
     status, sale = inst.post("/api/v1/sales/", {
         "client_id": str(uuid.uuid4()), "store": store,

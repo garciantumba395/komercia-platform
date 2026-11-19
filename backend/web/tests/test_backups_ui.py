@@ -1,5 +1,7 @@
 """Page Sauvegardes : coquille HTML, menu, bandeau global, logique JavaScript pure (Node, ignoré si absent)."""
 
+# ruff: noqa: E501
+
 import re
 import subprocess
 

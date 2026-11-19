@@ -319,6 +319,7 @@ class EmbeddedPostgres:
     # --- Sauvegarde de sécurité avant mise à jour -----------------------------------------------------------
     def dump_database(self, target: Path) -> Path:
         target.parent.mkdir(parents=True, exist_ok=True)
+        self._chown(target.parent)  # tests Linux en root : pg_dump tourne sous l'utilisateur postgres
         self._run("pg_dump", ["-h", "127.0.0.1", "-p", str(self.port), "-U", PG_SUPERUSER, "-Fc",
                               "-f", str(target), self.settings.db_name], timeout=1800,
                   env=self._env(PGPASSWORD=self.secrets.pg_superuser_password))

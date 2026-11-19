@@ -471,7 +471,7 @@
             toast('Abonnement activé jusqu’au ' + fmtDate(res.current_period_end) + '.', 'ok');
             await loadLists().catch(() => null);
             renderAll();
-          } catch (e) { err.appendChild(K.alertBox(e.message)); }
+          } catch (e) { err.appendChild(K.alertBox((e.data && e.data.detail) || e.message)); }
         });
       };
       go.addEventListener('click', submit);
