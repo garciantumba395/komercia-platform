@@ -187,8 +187,8 @@ def test_lock_prevents_concurrent_backups(tenant_a, cfg, folder):
 
 def test_validate_folder_rules(tmp_path, folder):
     assert services.validate_folder(str(folder)) == os.path.realpath(folder)
-    for bad in ["", "   ", "relatif/dossier", "sauvegardes", str(folder) + "/../x", "..", str(folder / "absent"),
-                str(folder / "a\x00b")]:
+    for bad in ["", "   ", "relatif/dossier", "sauvegardes", str(folder) + "/../x", "..",
+                str(folder / "absent"), str(folder / "a\x00b")]:
         with pytest.raises(services.FolderError):
             services.validate_folder(bad)
     f = folder / "fichier.txt"
