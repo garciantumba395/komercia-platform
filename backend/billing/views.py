@@ -127,6 +127,21 @@ class ChangePlanView(APIView):
                          "effective_at": sub.current_period_end if pending else None})
 
 
+class ChangePlanPreviewView(APIView):
+    """Aperçu d'un changement de plan : montant du complément (plan supérieur) ou date d'effet."""
+
+    permission_classes = [HasRole]
+    allowed_roles = READ_ROLES
+
+    def get(self, request):
+        data = ChangePlanSerializer(data={"plan": request.query_params.get("plan", ""),
+                                          "currency": request.query_params.get("currency", "USD")})
+        data.is_valid(raise_exception=True)
+        sub = _subscription(request)
+        return Response(services.preview_change_plan(
+            sub, plan_code=data.validated_data["plan"], currency=data.validated_data["currency"]))
+
+
 class CancelView(APIView):
     permission_classes = [HasRole]
     allowed_roles = WRITE_ROLES

@@ -9,6 +9,7 @@ urlpatterns = [
     path("payments/", views.PaymentListView.as_view()),
     path("payments/<uuid:pk>/receipt/", views.PaymentReceiptView.as_view()),
     path("change-plan/", views.ChangePlanView.as_view()),
+    path("change-plan/preview/", views.ChangePlanPreviewView.as_view()),
     path("cancel/", views.CancelView.as_view()),
     path("resume/", views.ResumeView.as_view()),
     path("notices/", views.NoticeListView.as_view()),

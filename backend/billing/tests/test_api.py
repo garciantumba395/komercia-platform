@@ -310,3 +310,18 @@ def test_audit_actions(tenant_a):
         assert entries["subscription.cancel"].user == tenant_a.user
         assert entries["subscription.state_change"].user is None
         assert entries["subscription.start"].entity_type == "subscription"
+
+
+def test_change_plan_preview_api(tenant_a):
+    client = tenant_a.client()
+    activate(tenant_a, now=timezone.now(), plan="essentiel")
+    r = client.get(f"{B}/change-plan/preview/?plan=pro")
+    assert r.status_code == 200 and r.json()["kind"] == "upgrade"
+    assert 0 < r.json()["amount_usd_minor"] <= 1000
+    assert client.get(f"{B}/change-plan/preview/?plan=essentiel").json()["kind"] == "same_plan"
+    assert client.get(f"{B}/change-plan/preview/").status_code == 400  # plan manquant
+    assert client.get(f"{B}/change-plan/preview/?plan=inconnu").status_code == 400
+    r = client.get(f"{B}/change-plan/preview/?plan=pro&currency=CDF")
+    assert r.status_code == 400 and r.json()["code"] == "no_exchange_rate"
+    with tenant_context(tenant_a.tenant.id):
+        assert SubscriptionPayment.objects.count() == 1

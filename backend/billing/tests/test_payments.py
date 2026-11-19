@@ -267,3 +267,31 @@ def test_check_limit(tenant_a):
         with pytest.raises(ValueError):
             check_limit(tenant_a.tenant, "widgets")
 
+
+
+def test_preview_matches_actual_change_plan(tenant_a):
+    set_rate(tenant_a, "2800")
+    sub = activate(tenant_a, now=NOW.replace(month=4), plan="pro")
+    now = sub.current_period_start + timedelta(days=15)
+    with tenant_context(tenant_a.tenant.id):
+        current = Subscription.objects.get()
+        preview = services.preview_change_plan(current, plan_code="business", currency="CDF", now=now)
+        _, payment, _ = services.change_plan(current, plan_code="business", currency="CDF",
+                                             phone="", now=now)
+    assert preview["kind"] == "upgrade"
+    assert (preview["amount_usd_minor"], preview["amount_minor"]) == (1250, 35000)
+    assert preview["amount_minor"] == payment.amount_minor and preview["rate_cdf_per_usd"] == "2800.0000"
+
+
+def test_preview_downgrade_and_same_plan_create_nothing(tenant_a):
+    from billing.models import SubscriptionPayment
+
+    sub = activate(tenant_a, now=NOW, plan="pro")
+    with tenant_context(tenant_a.tenant.id):
+        current = Subscription.objects.get()
+        down = services.preview_change_plan(current, plan_code="essentiel", now=NOW)
+        same = services.preview_change_plan(current, plan_code="pro", now=NOW)
+        assert SubscriptionPayment.objects.count() == 1  # seul le paiement d'activation
+    assert down["kind"] == "downgrade" and down["effective_at"] == sub.current_period_end
+    assert same["kind"] == "same_plan"
+    assert get_sub(tenant_a).pending_plan is None  # l'aperçu ne programme rien

@@ -342,6 +342,34 @@ def change_plan(sub: Subscription, *, plan_code: str, currency: str, phone: str,
     return "downgrade", None, None
 
 
+def preview_change_plan(sub: Subscription, *, plan_code: str, currency: str = "USD", now=None) -> dict:
+    """Aperçu (sans rien créer) d'un changement de plan : complément à payer ou date d'effet.
+
+    Mêmes règles que `change_plan` ; permet d'afficher le montant AVANT de payer.
+    """
+    now = _now(now)
+    sub = refresh_state(Subscription.objects.get(pk=sub.pk), now)
+    if sub.state != Subscription.ACTIVE or sub.plan_id is None:
+        raise BillingError("Souscrivez ou payez votre abonnement avant de changer de plan.",
+                           "no_active_subscription")
+    new = _active_plan(plan_code)
+    if new.id == sub.plan_id:
+        return {"kind": "same_plan", "plan": new.code}
+    current = sub.plan
+    if new.price_usd_minor > current.price_usd_minor:
+        due = prorata_usd_minor(current.price_usd_minor, new.price_usd_minor,
+                                sub.current_period_start, sub.current_period_end, now)
+        if due <= 0:
+            return {"kind": "upgrade", "plan": new.code, "amount_usd_minor": 0, "amount_minor": 0,
+                    "currency": currency, "rate_cdf_per_usd": None}
+        amount, usd, rate = price_in_currency(due, currency)
+        return {"kind": "upgrade", "plan": new.code, "amount_usd_minor": usd,
+                "amount_minor": amount, "currency": currency,
+                "rate_cdf_per_usd": None if rate is None else f"{rate:.4f}"}
+    _assert_plan_fits(new, sub.tenant_id)
+    return {"kind": "downgrade", "plan": new.code, "effective_at": sub.current_period_end}
+
+
 def _apply_plan(sub: Subscription, plan: Plan, user, reason="Passage au plan supérieur"):
     before = {"plan_id": sub.plan_id}
     sub.plan, sub.pending_plan = plan, None
