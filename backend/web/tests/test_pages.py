@@ -6,7 +6,10 @@ from django.contrib.staticfiles.views import serve
 from django.test import RequestFactory
 from django.urls import reverse
 
-PAGES = ["login", "register", "pos", "products", "stock", "customers", "rates", "sales", "dashboard", "users", "billing"]
+PAGES = [
+    "login", "register", "pos", "products", "stock", "customers", "rates", "sales", "dashboard", "users",
+    "billing",
+]
 
 
 @pytest.mark.django_db

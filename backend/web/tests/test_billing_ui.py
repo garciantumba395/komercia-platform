@@ -1,4 +1,4 @@
-"""Page Abonnement : coquille HTML, menu, bandeau global, et logique JavaScript pure (Node, ignoré si absent)."""
+"""Page Abonnement : coquille HTML, menu, bandeau global, logique JavaScript pure (Node, ignoré si absent)."""
 
 import re
 
@@ -64,7 +64,7 @@ def test_pos_disables_cashing_when_read_only():
 @needs_node
 def test_days_label():
     got = run([["billing.daysLabel", [n]] for n in (14, 2, 1, 0, -1, None)])
-    assert got == ["14 jours restants", "2 jours restants", "1 jour restant", "Dernier jour", "Dernier jour", "Dernier jour"]
+    assert got == ["14 jours restants", "2 jours restants", "1 jour restant"] + ["Dernier jour"] * 3
 
 
 def sub(state, days=None, **extra):
@@ -84,7 +84,8 @@ def test_banner_text_and_colour_follow_the_state():
     ])
     trial10, trial3, trial1, trial0, late, ro, active = got
     assert (trial10["tone"], trial10["text"]) == ("info", "Il vous reste 10 jours d’essai.")
-    assert trial3["tone"] == "warn" and trial3["text"] == "Il vous reste 3 jours d’essai."  # orange à 3 jours ou moins
+    # orange à 3 jours ou moins
+    assert trial3["tone"] == "warn" and trial3["text"] == "Il vous reste 3 jours d’essai."
     assert trial1["tone"] == "warn" and trial1["text"] == "Il vous reste 1 jour d’essai."
     assert trial0["text"] == "Dernier jour d’essai gratuit."
     assert trial10["action"] == {"label": "S’abonner", "href": "/app/abonnement/"}
@@ -100,9 +101,11 @@ def test_banner_for_non_owner_and_cancelled_subscription():
     ro, trial, cancelled = run([
         ["billing.bannerFor", [sub("read_only"), "manager"]],
         ["billing.bannerFor", [sub("trial", 8), "accountant"]],
-        ["billing.bannerFor", [sub("active", 9, cancel_at_period_end=True, current_period_end="2026-12-31T12:00:00Z"), "owner"]],
+        ["billing.bannerFor", [
+            sub("active", 9, cancel_at_period_end=True, current_period_end="2026-12-31T12:00:00Z"), "owner"]],
     ])
-    assert ro["text"].endswith("Demandez au propriétaire de s’abonner.") and ro["action"]["label"] == "Voir l’abonnement"
+    assert ro["text"].endswith("Demandez au propriétaire de s’abonner.")
+    assert ro["action"]["label"] == "Voir l’abonnement"
     assert trial["action"]["label"] == "Voir l’abonnement"
     assert cancelled["tone"] == "info" and "jusqu’au 31/12/2026" in cancelled["text"]
     assert cancelled["action"]["label"] == "Reprendre"
@@ -110,7 +113,8 @@ def test_banner_for_non_owner_and_cancelled_subscription():
 
 @needs_node
 def test_payment_status_labels_are_french():
-    got = run([["billing.paymentStatusLabel", [s]] for s in ("pending", "confirmed", "failed", "expired", "autre")])
+    statuses = ("pending", "confirmed", "failed", "expired", "autre")
+    got = run([["billing.paymentStatusLabel", [s]] for s in statuses])
     assert got == ["En attente", "Confirmé", "Échoué", "Expiré", "autre"]
     tones = run([["billing.paymentStatus", [s]] for s in ("confirmed", "failed")])
     assert [t[1] for t in tones] == ["ok", "danger"]
@@ -118,5 +122,6 @@ def test_payment_status_labels_are_french():
 
 @needs_node
 def test_billing_roles():
-    got = run([["billing.canRead", [r]] for r in ("owner", "manager", "accountant", "cashier", "storekeeper")])
+    roles = ("owner", "manager", "accountant", "cashier", "storekeeper")
+    got = run([["billing.canRead", [r]] for r in roles])
     assert got == [True, True, True, False, False]
