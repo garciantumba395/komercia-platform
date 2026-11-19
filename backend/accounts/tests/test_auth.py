@@ -116,3 +116,24 @@ def test_only_owner_can_change_roles(tenant_a):
     manager.credentials(HTTP_AUTHORIZATION=f"Token {login.data['token']}")
     assert manager.patch(f"/api/v1/users/{uid}/", {"role": "cashier"},
                          format="json").status_code == 403
+
+
+def test_single_tenant_installation_refuses_a_second_company(settings):
+    settings.KOMERSIA_SINGLE_TENANT = True
+    api = APIClient()
+    first = api.post("/api/v1/auth/register/", REGISTER, format="json")
+    assert first.status_code == 201
+    second = api.post("/api/v1/auth/register/",
+                      {**REGISTER, "phone": "+243992222333", "business_name": "Autre"}, format="json")
+    assert second.status_code == 403
+    assert second.data["code"] == "already_configured"
+    # La connexion de l'entreprise existante reste possible.
+    login = api.post("/api/v1/auth/login/", {"phone": REGISTER["phone"], "password": REGISTER["password"]})
+    assert login.status_code == 200
+
+
+def test_multi_tenant_default_allows_many_companies():
+    api = APIClient()
+    assert api.post("/api/v1/auth/register/", REGISTER, format="json").status_code == 201
+    other = {**REGISTER, "phone": "+243992222444", "business_name": "Autre"}
+    assert api.post("/api/v1/auth/register/", other, format="json").status_code == 201

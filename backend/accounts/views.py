@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import transaction
 from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny
@@ -9,7 +10,7 @@ from audit.mixins import AuditedMixin
 from billing.services import check_limit
 from core.permissions import ACCOUNTANT, CASHIER, MANAGER, OWNER, ROLES, STOREKEEPER, HasRole
 
-from .models import Membership, Store, User
+from .models import Membership, Store, Tenant, User
 from .serializers import (
     LoginSerializer,
     MemberCreateSerializer,
@@ -25,6 +26,14 @@ class RegisterView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        # Édition locale : une installation = une entreprise. Une fois la boutique configurée,
+        # personne (même sur le réseau local) ne peut en créer une autre.
+        if getattr(settings, "KOMERSIA_SINGLE_TENANT", False) and Tenant.objects.exists():
+            return Response(
+                {"detail": "Cette installation est déjà configurée. Connectez-vous avec votre compte.",
+                 "code": "already_configured"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user, tenant, store = register_merchant(**serializer.validated_data)

@@ -10,6 +10,8 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "gunicorn>=22",
     "whitenoise>=6.7",
+    "cryptography>=42",   # clés de licence (signatures Ed25519)
+    "waitress>=3.0",      # serveur WSGI de l'édition locale Windows (gunicorn ne tourne pas sous Windows)
 ]
 
 [dependency-groups]

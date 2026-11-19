@@ -1,6 +1,7 @@
 # Cahier des charges — Komersia
 
-> Version 1.1 — base de référence du dépôt `komersia-platform`.
+> Version 1.2 — base de référence du dépôt `komersia-platform`.
+> **Décision du 19 novembre 2026 : édition locale Windows en premier, paiements en espèces (CDF et USD), Mobile Money et hébergement en ligne repoussés** — voir `docs/adr/0003-edition-locale-windows.md` et la section 24.
 > Les exigences sont identifiées par un code, priorisées et rédigées de façon testable.
 > **Priorités :** P0 = indispensable au MVP · P1 = important, juste après le MVP · P2 = évolution · P3 = long terme.
 > **Statut des chiffres :** les valeurs marquées *(hypothèse)* sont à valider avec les commerçants pilotes avant toute décision.
@@ -285,6 +286,8 @@ Le projet démarre en **monolithe modulaire** : un seul déploiement, mais des m
 | SMS | Notifications essentielles | P1 |
 | Imprimante thermique | Reçus de caisse | P0 |
 | Export comptable | Factures, ventes et paiements | P2 |
+
+> **Mise à jour (19/11/2026) :** les intégrations Mobile Money, WhatsApp et SMS sont **repoussées**. En boutique, le paiement se fait en espèces, en CDF et en USD. Les priorités P0 ci-dessus qui les concernent (KOM-031, KOM-035, intégrations de ce tableau) ne font pas partie de la première édition.
 
 ## 10. Parcours utilisateurs clés
 
@@ -573,3 +576,33 @@ Les points suivants sont à valider avec un conseil juridique local avant le lan
 | Factures, devis, retours | M3 | KOM-026, KOM-064 |
 | Multi-boutiques | M3 | KOM-003, KOM-063 |
 | Modules sectoriels et fidélité | M4 | Section 5, KOM-055 |
+
+## 24. Édition locale (première édition livrée)
+
+Décision du 19 novembre 2026 (voir `docs/adr/0003-edition-locale-windows.md`).
+
+### 24.1 Principe
+L'application est installée sur le PC principal de la boutique par un fichier d'installation Windows. Tout tourne en local : base de données, serveur web, application. Les autres appareils de la boutique (PC, téléphones) s'y connectent par un navigateur sur le réseau local.
+
+### 24.2 Exigences
+
+| ID | Exigence | Priorité |
+|---|---|---|
+| KOM-090 | Un installateur Windows 10 et 11 (64 bits) doit installer l'application, la base de données et le serveur, sans connaissance technique, avec un assistant en français. | P0 |
+| KOM-091 | L'application doit démarrer automatiquement avec le PC, sans qu'une session soit ouverte. | P0 |
+| KOM-092 | Les autres appareils du réseau de la boutique doivent pouvoir se connecter avec un navigateur ; l'adresse à utiliser doit être affichée. Le port n'est ouvert que sur le réseau privé. | P0 |
+| KOM-093 | Une installation ne doit contenir qu'une seule entreprise. | P0 |
+| KOM-094 | La base de données ne doit écouter que sur le PC lui-même ; aucun mot de passe par défaut. | P0 |
+| KOM-095 | Une mise à jour de l'installateur doit conserver les données ; la désinstallation doit conserver les données par défaut. | P0 |
+| KOM-096 | L'abonnement doit se gérer par clé de licence mensuelle saisie à la main, liée à l'installation, vérifiée hors ligne, non réutilisable. | P0 |
+| KOM-097 | Le recul de l'horloge du PC ne doit pas permettre de prolonger un essai ou un abonnement. | P1 |
+| KOM-098 | Une sauvegarde automatique quotidienne doit être faite vers un dossier choisi (disque ou clé USB), vérifiée, avec conservation des 30 dernières. | P0 |
+| KOM-099 | L'application doit alerter le propriétaire et le gérant quand la dernière sauvegarde est ancienne ou a échoué. | P0 |
+| KOM-100 | La restauration d'une sauvegarde doit être possible par une procédure simple documentée. | P0 |
+| KOM-101 | Les reçus doivent s'imprimer sur l'imprimante installée dans Windows. | P0 |
+
+### 24.3 Hors périmètre de la première édition
+Mobile Money, WhatsApp/SMS, hébergement en ligne, console d'exploitation `/ops/`, application Android, mises à jour automatiques à distance, HTTPS local.
+
+### 24.4 Risques propres à l'édition locale
+Panne du PC principal, perte de données sans sauvegarde, assistance à distance difficile, absence de vision centrale sur les installations, contournement de la licence par un utilisateur déterminé, mots de passe en HTTP sur le réseau local.
