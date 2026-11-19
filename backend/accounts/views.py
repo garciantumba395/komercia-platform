@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from audit import services as audit
 from audit.mixins import AuditedMixin
+from billing.services import check_limit
 from core.permissions import ACCOUNTANT, CASHIER, MANAGER, OWNER, ROLES, STOREKEEPER, HasRole
 
 from .models import Membership, Store, User
@@ -90,6 +91,10 @@ class StoreViewSet(AuditedMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         return Store.objects.order_by("name")  # filtré par la RLS
 
+    def perform_create(self, serializer):
+        check_limit(self.request.tenant, "stores")  # limite du plan d'abonnement
+        super().perform_create(serializer)
+
 
 class MemberViewSet(viewsets.ViewSet):
     """Gestion des utilisateurs du commerçant (propriétaire uniquement, KOM-005)."""
@@ -106,6 +111,7 @@ class MemberViewSet(viewsets.ViewSet):
         serializer = MemberCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        check_limit(request.tenant, "users")  # limite du plan d'abonnement
         user = User.objects.create_user(phone=data["phone"], password=data["password"],
                                         full_name=data["full_name"])
         member = Membership.objects.create(user=user, tenant=request.tenant, role=data["role"])

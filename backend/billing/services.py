@@ -173,6 +173,23 @@ def is_write_allowed(tenant_or_subscription, now=None) -> bool:
     return effective_state(sub, now) != Subscription.READ_ONLY
 
 
+def is_write_allowed_at(tenant_or_subscription, when: datetime, now=None) -> bool:
+    """Une opération faite hors ligne à `when` (device_time) est-elle acceptable à la synchronisation ?
+
+    Vrai tant que l'abonnement n'est pas en lecture seule ; en lecture seule, seules les opérations
+    antérieures à `read_only_since` sont acceptées (KOM-074 : rejouer les ventes déjà faites).
+    """
+    sub = tenant_or_subscription
+    if not isinstance(sub, Subscription):
+        sub = _subscription_of(sub)
+        if sub is None:
+            return True
+    since = evaluate(sub, _now(now))["read_only_since"]
+    if since is None or evaluate(sub, _now(now))["state"] != Subscription.READ_ONLY:
+        return True
+    return when < since
+
+
 # --------------------------------------------------------------------------- plans et limites
 
 

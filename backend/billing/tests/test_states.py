@@ -102,3 +102,15 @@ def test_tick_is_idempotent(tenant_a):
     second = services.tick(NOW + timedelta(days=1))
     assert first["state_changes"] == 1 and second["state_changes"] == 0
     assert second["notices"] == 0
+
+
+def test_is_write_allowed_at_for_offline_sync(tenant_a):
+    from billing.services import is_write_allowed_at
+
+    update_sub(tenant_a, trial_ends_at=NOW)
+    sub = get_sub(tenant_a)
+    later = NOW + timedelta(days=3)
+    assert is_write_allowed_at(sub, NOW - timedelta(hours=1), now=later)  # vente faite avant la fin
+    assert not is_write_allowed_at(sub, NOW + timedelta(hours=1), now=later)  # faite après
+    assert is_write_allowed_at(sub, NOW + timedelta(hours=1), now=NOW - timedelta(days=1))
+    assert is_write_allowed_at(tenant_a.tenant, later, now=NOW - timedelta(days=1))

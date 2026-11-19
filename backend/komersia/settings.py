@@ -106,7 +106,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["core.tenancy.TenantTokenAuthentication"],
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+        "billing.permissions.SubscriptionWriteAllowed",  # lecture seule si abonnement terminé
+    ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
@@ -120,3 +123,8 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }
+
+# Abonnement. Le fournisseur « sandbox » permet de confirmer ses propres paiements sans authentification :
+# il n'est actif par défaut qu'en développement (DEBUG). En production, définir un fournisseur réel.
+BILLING_PROVIDER = os.environ.get("BILLING_PROVIDER", "sandbox" if DEBUG else "")
+BILLING_WEBHOOK_SECRET = os.environ.get("BILLING_WEBHOOK_SECRET")

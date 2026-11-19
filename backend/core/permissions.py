@@ -29,4 +29,10 @@ class HasRole(BasePermission):
         by_action = getattr(view, "allowed_roles_by_action", None)
         if by_action is not None:
             roles = by_action.get(getattr(view, "action", None), roles)
-        return bool(roles) and membership.role in roles
+        if not (bool(roles) and membership.role in roles):
+            return False
+        # Les vues qui déclarent HasRole remplacent les permissions par défaut : on applique ici
+        # la règle de lecture seule de l'abonnement (import tardif : billing dépend de core).
+        from billing.permissions import SubscriptionWriteAllowed
+
+        return SubscriptionWriteAllowed().has_permission(request, view)

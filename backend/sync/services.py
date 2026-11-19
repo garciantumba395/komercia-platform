@@ -23,9 +23,10 @@ from django.utils import timezone
 
 from accounts.models import Store
 from audit import services as audit
+from billing import services as billing
 from catalog.models import Product
 from core.permissions import CASHIER, MANAGER, OWNER
-from core.tenancy import activate_tenant
+from core.tenancy import activate_tenant, get_current_tenant_id
 from customers.models import Customer
 from sales import services as sales
 from sales.models import CashSession, Sale
@@ -146,6 +147,11 @@ def _sale_create(op: Operation, user, role: str) -> Outcome:
         data["device_time"] = op.device_time
 
     if not Sale.objects.filter(client_id=data["client_id"]).exists():
+        # KOM-074 : une vente faite après le passage en lecture seule n'est pas acceptée ;
+        # celles faites avant (hors ligne) le sont toujours.
+        if not billing.is_write_allowed_at(get_current_tenant_id(), data["device_time"]):
+            raise OpRejected("subscription_inactive",
+                             "Abonnement terminé : cette vente a été faite après la fin de l'abonnement.")
         _check_sale_dependencies(data, user, role)
     try:
         sale, created = sales.create_sale(data, user=user, role=role)
