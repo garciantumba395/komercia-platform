@@ -45,6 +45,8 @@ jobs:
       # Console d'exploitation (alias `ops`) : rôle komersia_ops créé par scripts/db-init.sql.
       DB_OPS_USER: komersia_ops
       DB_OPS_PASSWORD: ci-ops-password
+      # Mot de passe du rôle applicatif komersia_app (créé plus bas par db-init.sql), pour les tests qui s'y connectent.
+      KOMERSIA_TEST_APP_PASSWORD: ci-app-password
       DJANGO_SECRET_KEY: ci-only-not-a-secret
       DJANGO_DEBUG: "0"
       DJANGO_ALLOWED_HOSTS: localhost

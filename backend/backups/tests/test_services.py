@@ -49,7 +49,8 @@ def test_ordinary_role_is_refused_with_a_clear_message_and_no_file(tenant_a, cfg
     make_data(tenant_a, sales=1)
     monkeypatch.delenv("DB_BACKUP_USER")  # retombe sur le rôle de la base par défaut (non BYPASSRLS ici)
     monkeypatch.setenv("DB_BACKUP_USER", "komersia_app")
-    monkeypatch.setenv("DB_BACKUP_PASSWORD", "app")
+    # Mot de passe du rôle applicatif : « app » en développement, autre valeur en CI (variable dédiée).
+    monkeypatch.setenv("DB_BACKUP_PASSWORD", os.environ.get("KOMERSIA_TEST_APP_PASSWORD", "app"))
     record = services.create_backup("manual")
     assert record.status == "echec" and "BYPASSRLS" in record.message
     assert files(folder) == []
