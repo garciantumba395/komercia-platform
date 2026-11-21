@@ -213,6 +213,17 @@ try {
     Assert ($owners -contains 'NETWORK SERVICE') "PostgreSQL doit tourner sous NETWORK SERVICE (propriétaires : $owners)"
 
     Step '6. Secrets illisibles par les autres comptes'
+    # Preuve POSITIVE : le compte administrateur de ce test ne doit PAS pouvoir lire secrets.json ni entrer dans pgdata
+    # (réservés au service). Un « Access is denied » d'icacls seul ne prouvait rien : sa sortie vide faisait passer
+    # les vérifications suivantes à vide.
+    $secretsFile = Join-Path $DataDir 'config\secrets.json'
+    $canRead = $true
+    try { Get-Content -Raw -LiteralPath $secretsFile -ErrorAction Stop | Out-Null } catch { $canRead = $false }
+    Assert (-not $canRead) 'secrets.json est lisible par un compte ordinaire (administrateur du test) : il devrait être réservé au service'
+    $canListPg = $true
+    try { Get-ChildItem -LiteralPath (Join-Path $DataDir 'pgdata') -ErrorAction Stop | Out-Null } catch { $canListPg = $false }
+    Assert (-not $canListPg) 'pgdata est listable par un compte ordinaire (administrateur du test) : il devrait être réservé au service'
+    Write-Host 'Confirmé : secrets.json et pgdata sont illisibles pour le compte du test.'
     $acl = (& icacls (Join-Path $DataDir 'config\secrets.json')) -join "`n"
     Write-Host $acl
     Assert ($acl -notmatch 'Users|Everyone|Authenticated Users|BUILTIN\\Users') 'secrets.json est lisible par des comptes non autorisés'
