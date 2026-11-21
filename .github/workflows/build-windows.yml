@@ -16,6 +16,16 @@ on:
         type: boolean
         default: false
   push:
+    # Branches de travail et principale : la construction se lance à chaque changement de l'installateur
+    # (le bouton « Run workflow » n'existe que pour les workflows présents sur la branche par défaut).
+    branches:
+      - "ccr-**"
+      - main
+    paths:
+      - "desktop/**"
+      - "backend/komersia/settings_local.py"
+      - "backend/komersia/urls_local.py"
+      - ".github/workflows/build-windows.yml"
     tags:
       - "v*"
 
@@ -27,9 +37,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  prepare:
+    name: Préparation
+    runs-on: ubuntu-latest
+    outputs:
+      pg_sha_empty: ${{ steps.pg.outputs.empty }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: pg
+        name: La somme SHA-256 de PostgreSQL est-elle renseignée ?
+        run: |
+          if python3 -c "import json,sys; sys.exit(0 if not json.load(open('desktop/build/postgres.json'))['sha256'].strip() else 1)"; then
+            echo "empty=true" >> "$GITHUB_OUTPUT"
+            echo "La somme SHA-256 est vide : le job pg-hash va l'afficher."
+          else
+            echo "empty=false" >> "$GITHUB_OUTPUT"
+          fi
+
   pg-hash:
     name: Somme SHA-256 de PostgreSQL
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.print_pg_hash }}
+    needs: prepare
+    if: ${{ needs.prepare.outputs.pg_sha_empty == 'true' || (github.event_name == 'workflow_dispatch' && inputs.print_pg_hash) }}
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -40,7 +68,8 @@ jobs:
 
   build:
     name: Construire, installer et tester sur Windows
-    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.print_pg_hash) }}
+    needs: prepare
+    if: ${{ needs.prepare.outputs.pg_sha_empty == 'false' && !(github.event_name == 'workflow_dispatch' && inputs.print_pg_hash) }}
     runs-on: windows-latest
     timeout-minutes: 60
     env:
