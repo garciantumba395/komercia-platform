@@ -46,6 +46,17 @@ function Invoke-Uninstaller([string[]]$ExtraArgs, [string]$LogName) {
     Assert (Test-Path $un) "Désinstalleur introuvable : $un"
     $args1 = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$LogDir\$LogName") + $ExtraArgs
     $p = Start-Process -FilePath $un -ArgumentList $args1 -Wait -PassThru
+    if ($p.ExitCode -ne 0) {
+        # Affiche le journal du désinstalleur directement dans la sortie de la CI (les artefacts ne sont pas
+        # toujours consultables) : c'est la seule façon de voir pourquoi il échoue.
+        $log = Join-Path $LogDir $LogName
+        Write-Host "::group::Journal du désinstalleur ($log)"
+        if (Test-Path $log) { Get-Content $log -Tail 120 | ForEach-Object { Write-Host $_ } } else { Write-Host '(pas de journal)' }
+        Write-Host '::endgroup::'
+        Write-Host "::group::Contenu de $InstallDir"
+        if (Test-Path $InstallDir) { Get-ChildItem $InstallDir -Recurse -ErrorAction SilentlyContinue | Select-Object -First 60 FullName | ForEach-Object { Write-Host $_.FullName } }
+        Write-Host '::endgroup::'
+    }
     Assert ($p.ExitCode -eq 0) "Le désinstalleur a échoué (code $($p.ExitCode))"
 }
 
