@@ -37,7 +37,9 @@
 
 ## Ce qui reste, par priorité
 
-Issues ouvertes : #14 (Mobile Money), #15 (hébergement et durcissement), #16 (remboursement d'une vente à crédit), #13 (prototype Flutter).
+Issues ouvertes : #14 (Mobile Money par agrégateur, reporté), #15 (hébergement en ligne, reporté), #16 (remboursement d'une vente à crédit), #13 (prototype Flutter), #17 (édition locale : installateur, licences, sauvegardes).
+
+Tickets ajoutés le 21 novembre 2026 (cahier des charges d'architecture v1.0), qui complètent les issues M1 existantes sans les dupliquer : #18 (stock sérialisé par IMEI / numéro de série), #19 (Mobile Money manuel : référence et rapprochement à la clôture), #20 (multi-terminaux : identifiant d'appareil et reçus préfixés par caisse).
 
 | Sujet | Bloqué par |
 |---|---|
