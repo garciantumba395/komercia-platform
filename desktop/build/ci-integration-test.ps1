@@ -44,20 +44,26 @@ function Invoke-Installer([string[]]$ExtraArgs, [string]$LogName) {
 function Invoke-Uninstaller([string[]]$ExtraArgs, [string]$LogName) {
     $un = Join-Path $InstallDir 'unins000.exe'
     Assert (Test-Path $un) "Désinstalleur introuvable : $un"
-    $args1 = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$LogDir\$LogName") + $ExtraArgs
+    $log = Join-Path $LogDir $LogName
+    $args1 = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=$log") + $ExtraArgs
     $p = Start-Process -FilePath $un -ArgumentList $args1 -Wait -PassThru
-    if ($p.ExitCode -ne 0) {
-        # Affiche le journal du désinstalleur directement dans la sortie de la CI (les artefacts ne sont pas
-        # toujours consultables) : c'est la seule façon de voir pourquoi il échoue.
-        $log = Join-Path $LogDir $LogName
+    # Le désinstalleur Inno Setup se relance depuis un dossier temporaire (_unins.tmp) : le code de sortie du premier
+    # processus n'est pas fiable (-1 observé alors que le journal dit « Uninstallation process succeeded » et que tous
+    # les fichiers sont supprimés). On attend donc la fin du vrai désinstalleur et on vérifie le JOURNAL.
+    $deadline = (Get-Date).AddSeconds(120)
+    $ok = $false
+    while ((Get-Date) -lt $deadline) {
+        $running = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -like 'unins*' -or $_.ProcessName -like '_unins*' }
+        if ((Test-Path $log) -and (Select-String -Path $log -Pattern 'Uninstallation process succeeded' -Quiet) -and -not $running) { $ok = $true; break }
+        Start-Sleep -Seconds 2
+    }
+    if (-not $ok) {
         Write-Host "::group::Journal du désinstalleur ($log)"
         if (Test-Path $log) { Get-Content $log -Tail 120 | ForEach-Object { Write-Host $_ } } else { Write-Host '(pas de journal)' }
         Write-Host '::endgroup::'
-        Write-Host "::group::Contenu de $InstallDir"
-        if (Test-Path $InstallDir) { Get-ChildItem $InstallDir -Recurse -ErrorAction SilentlyContinue | Select-Object -First 60 FullName | ForEach-Object { Write-Host $_.FullName } }
-        Write-Host '::endgroup::'
+        Fail "Le journal ne confirme pas la désinstallation (code de sortie $($p.ExitCode))."
     }
-    Assert ($p.ExitCode -eq 0) "Le désinstalleur a échoué (code $($p.ExitCode))"
+    Write-Host "Désinstallation confirmée par le journal (code de sortie du processus lancé : $($p.ExitCode), non significatif)."
 }
 
 function Wait-Healthy([int]$TimeoutSec = 300) {
