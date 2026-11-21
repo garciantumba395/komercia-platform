@@ -131,10 +131,19 @@ function Uninstall-Komersia {
 function Remove-Data {
     if (-not (Test-Path $DataDir)) { return }
     Write-Step "Suppression des données : $DataDir"
-    # pgdata et securite sont réservés au service : l'administrateur en reprend d'abord la propriété.
-    & takeown.exe /F $DataDir /R /D O | Out-Null
-    Invoke-Icacls @($DataDir, '/grant', "${SidAdmins}:(OI)(CI)F", '/T', '/C', '/Q')
-    Remove-Item -Recurse -Force $DataDir
+    # pgdata et securite sont réservés au service (NETWORK SERVICE) : l'administrateur en reprend d'abord la propriété.
+    # /A : la propriété va au groupe Administrateurs ; /R : récursif ; /D Y : répondre « oui » pour un dossier non listable
+    # (l'ancienne option « /D O » était invalide : takeown échouait sans rien dire et la suppression s'arrêtait).
+    & takeown.exe /F $DataDir /A /R /D Y | Out-Null
+    if ($LASTEXITCODE -ne 0) { Write-Step "takeown : code $LASTEXITCODE (on continue)" }
+    & icacls.exe $DataDir /grant "${SidAdmins}:(OI)(CI)F" /T /C /Q | Out-Null
+    if ($LASTEXITCODE -ne 0) { Write-Step "icacls : code $LASTEXITCODE (on continue)" }
+    try { Remove-Item -Recurse -Force $DataDir -ErrorAction Stop }
+    catch {
+        Write-Step "Remove-Item a échoué ($($_.Exception.Message)) : essai avec rmdir"
+        & cmd.exe /c rmdir /s /q "$DataDir"
+    }
+    if (Test-Path $DataDir) { throw "Le dossier de données n'a pas pu être supprimé : $DataDir" }
 }
 
 switch ($Action) {

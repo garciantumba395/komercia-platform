@@ -258,6 +258,11 @@ try {
 
     Step '12. Désinstallation avec suppression des données'
     Invoke-Uninstaller @('/PURGEDATA=1') 'uninstall-purge.log'
+    if (Test-Path $DataDir) {
+        Write-Host "::group::Contenu restant de $DataDir"
+        Get-ChildItem $DataDir -Force -Recurse -ErrorAction SilentlyContinue | Select-Object -First 40 | ForEach-Object { Write-Host $_.FullName }
+        Write-Host '::endgroup::'
+    }
     Assert (-not (Test-Path $DataDir)) "Le dossier de données existe encore : $DataDir"
     Write-Host "`nTOUS LES TESTS D'INTÉGRATION WINDOWS ONT RÉUSSI" -ForegroundColor Green
 }
