@@ -21,7 +21,7 @@ def test_page_responds_with_french_title(client, name):
     assert html.lstrip().lower().startswith("<!doctype html>")
     assert '<html lang="fr">' in html
     title = re.search(r"<title>(.+?)</title>", html).group(1)
-    assert title.endswith("– Komersia") and len(title) > len("– Komersia") + 2
+    assert title.endswith("– Komersia.App") and len(title) > len("– Komersia.App") + 2
     assert html.count("<main") == 1 and 'id="view"' in html
 
 

@@ -678,53 +678,114 @@
   /* ======================= TABLEAU DE BORD ======================= */
   K.pages.dashboard = async function (view, ctx) {
     const date = h('input', { type: 'date', value: K.todayISO(), id: 'dash-date' });
-    const salesBox = h('div');
+    const kpiBox = h('div');
+    const chartBox = h('div', { class: 'card chart-card' });
+    const topBox = h('div', { class: 'card' });
     const debtsBox = h('div', { class: 'card' });
     const stockBox = h('div', { class: 'card' });
-    const topBox = h('div', { class: 'card' });
+    const first = (ctx.me.full_name || '').split(/\s+/)[0] || '';
+    const hour = new Date().getHours();
+    const greet = hour < 12 ? 'Bonjour' : (hour < 18 ? 'Bon après-midi' : 'Bonsoir');
+    const DAYS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+    let chartCurrency = 'CDF';
 
-    function kpi(label, value) { return h('div', { class: 'kpi' }, h('div', { class: 'k' }, label), h('div', { class: 'v' }, value)); }
+    const ICO = {
+      sale: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z"/><path d="M9 8h6M9 12h6"/>',
+      cash: '<rect x="3" y="6" width="18" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/>',
+      credit: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M17 8v6M14 11h6"/>',
+      margin: '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+      plus: '<path d="M12 5v14M5 12h14"/>',
+    };
+    const icon = (key) => { const s = h('span', { class: 'ico', 'aria-hidden': 'true' }); s.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + ICO[key] + '</svg>'; return s; };
     const mapLines = (m) => {
       const parts = ['CDF', 'USD'].filter((c) => m && m[c]).map((c) => h('div', null, fmt(m[c], c)));
       return parts.length ? parts : [h('div', null, fmt(0, 'CDF'))];
     };
+    function kpi(tone, key, label, value) {
+      return h('div', { class: 'kpi t-' + tone }, h('div', { class: 'k' }, icon(key), label), h('div', { class: 'v' }, value));
+    }
+    const compact = (n, c) => {
+      const v = c === 'USD' ? n / 100 : n;
+      if (v >= 1e6) return (v / 1e6).toFixed(1).replace('.', ',') + ' M';
+      if (v >= 1e3) return Math.round(v / 1e3) + ' k';
+      return String(Math.round(v));
+    };
+
+    function drawChart(rows, selected) {
+      clear(chartBox);
+      const present = ['CDF', 'USD'].filter((c) => rows.some((r) => r.revenue[c] > 0));
+      if (!present.includes(chartCurrency)) chartCurrency = present[0] || 'CDF';
+      const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Devise du graphique' });
+      if (present.length > 1) {
+        ['CDF', 'USD'].forEach((c) => seg.appendChild(h('button', { type: 'button', 'aria-pressed': String(c === chartCurrency), onclick: () => { chartCurrency = c; drawChart(rows, selected); } }, c)));
+      }
+      chartBox.appendChild(h('div', { class: 'chart-head' }, h('div', null, h('h2', null, 'Ventes des 7 derniers jours'), h('div', { class: 'chart-sub' }, 'Chiffre d’affaires par jour (' + chartCurrency + ')')), present.length > 1 ? seg : null));
+      const max = Math.max(1, ...rows.map((r) => r.revenue[chartCurrency] || 0));
+      const total = rows.reduce((t, r) => t + (r.revenue[chartCurrency] || 0), 0);
+      if (!total) { chartBox.appendChild(h('div', { class: 'empty' }, 'Aucune vente sur les 7 derniers jours.')); return; }
+      const bars = h('div', { class: 'bars', role: 'img', 'aria-label': 'Ventes par jour : ' + rows.map((r) => r.date + ' ' + fmt(r.revenue[chartCurrency] || 0, chartCurrency)).join(', ') });
+      rows.forEach((r) => {
+        const v = r.revenue[chartCurrency] || 0;
+        const d = new Date(r.date + 'T12:00:00');
+        const pct = v ? Math.max(4, Math.round((v / max) * 100)) : 2;
+        bars.appendChild(h('div', { class: 'bar-col' + (r.date === selected ? ' sel' : ''), title: fmt(v, chartCurrency) },
+          h('div', { class: 'bar-val' }, v ? compact(v, chartCurrency) : ''),
+          h('div', { class: 'bar-track' }, h('div', { class: 'bar' + (r.date === selected ? ' today' : '') + (v ? '' : ' empty'), style: 'height:' + pct + '%' })),
+          h('div', { class: 'bar-day' }, h('span', null, DAYS[d.getDay()]), h('b', null, String(d.getDate())))));
+      });
+      chartBox.appendChild(bars);
+      chartBox.appendChild(h('div', { class: 'chart-sub', style: 'margin-top:.6rem' }, 'Total sur la période : ', h('strong', null, fmt(total, chartCurrency))));
+    }
+
+    async function loadWeek() {
+      clear(chartBox).appendChild(h('div', { class: 'skeleton', style: 'height:230px' }));
+      try {
+        const r = await api('reports/summary/?period=week&store=' + ctx.store.id);
+        drawChart(r.by_day || [], K.todayISO());
+      } catch (e) {
+        clear(chartBox).hidden = true;
+      }
+    }
 
     async function loadReport() {
-      clear(salesBox);
+      clear(kpiBox).appendChild(h('div', { class: 'kpis' }, [1, 2, 3, 4].map(() => h('div', { class: 'skeleton' }))));
       clear(topBox);
       topBox.hidden = false;
       try {
         const r = await api('reports/daily/?store=' + ctx.store.id + '&date=' + (date.value || K.todayISO()));
-        salesBox.appendChild(h('div', { class: 'kpis' },
-          kpi('Ventes', String(r.sales_count !== undefined ? r.sales_count : 0)), kpi('Chiffre d’affaires', mapLines(r.revenue)),
-          kpi('Encaissé', mapLines(r.cash_collected)), kpi('Crédit accordé', mapLines(r.credit_given)),
-          r.estimated_margin ? kpi('Marge estimée', mapLines(r.estimated_margin)) : null));
-        topBox.appendChild(h('h2', null, 'Produits les plus vendus'));
+        clear(kpiBox).appendChild(h('div', { class: 'kpis' },
+          kpi('blue', 'sale', 'Ventes', String(r.sales_count !== undefined ? r.sales_count : 0)),
+          kpi('green', 'cash', 'Encaissé', mapLines(r.cash_collected)),
+          kpi('orange', 'credit', 'Crédit accordé', mapLines(r.credit_given)),
+          r.estimated_margin ? kpi('navy', 'margin', 'Marge estimée', mapLines(r.estimated_margin)) : kpi('navy', 'margin', 'Chiffre d’affaires', mapLines(r.revenue))));
+        topBox.appendChild(h('div', { class: 'card-head' }, h('h2', null, 'Produits les plus vendus'), h('div', { class: 'chart-sub' }, 'CA du jour : ' + mapLines(r.revenue).map((d) => d.textContent).join(' · '))));
         const top = r.top_products || [];
         if (!top.length) topBox.appendChild(h('div', { class: 'empty' }, 'Aucune vente ce jour-là.'));
-        top.forEach((t, i) => topBox.appendChild(h('div', { class: 'row-card' },
-          h('div', { class: 'main' }, h('div', { class: 'title' }, (i + 1) + '. ' + t.name), h('div', { class: 'sub' }, fmtQty(t.quantity) + ' vendu(s)')),
-          h('div', { class: 'amount' }, fmt(t.revenue_minor, t.currency)))));
+        const maxByCur = {};
+        top.forEach((t) => { maxByCur[t.currency] = Math.max(maxByCur[t.currency] || 0, t.revenue_minor); });
+        top.forEach((t, i) => topBox.appendChild(h('div', { class: 'top-row' },
+          h('div', { class: 'top-head' }, h('span', { class: 'top-rank' }, String(i + 1)), h('div', { class: 'top-name' }, t.name), h('div', { class: 'top-amount' }, fmt(t.revenue_minor, t.currency))),
+          h('div', { class: 'top-meter', 'aria-hidden': 'true' }, h('div', { style: 'width:' + Math.max(4, Math.round((t.revenue_minor / (maxByCur[t.currency] || 1)) * 100)) + '%' })),
+          h('div', { class: 'top-sub' }, fmtQty(t.quantity) + ' vendu(s)'))));
       } catch (e) {
         topBox.hidden = true;
-        salesBox.appendChild(K.alertBox(unavailable(e) || (e.status === 404) ? 'Rapports bientôt disponibles. Les dettes et les ruptures ci-dessous sont déjà à jour.' : e.message, unavailable(e) || e.status === 404 ? 'info' : 'error'));
+        clear(kpiBox).appendChild(K.alertBox(unavailable(e) || (e.status === 404) ? 'Rapports bientôt disponibles. Les dettes et les ruptures ci-dessous sont déjà à jour.' : e.message, unavailable(e) || e.status === 404 ? 'info' : 'error'));
       }
     }
 
     async function loadDebts() {
-      clear(debtsBox).appendChild(h('h2', null, 'Dettes des clients'));
+      clear(debtsBox).appendChild(h('div', { class: 'card-head' }, h('h2', null, 'Dettes des clients'), h('a', { href: '/app/clients/' }, 'Voir tout')));
       try {
         const rows = await api('customers/debts/');
         const totals = {};
         rows.forEach((d) => Object.entries(d.balance).forEach(([c, v]) => { totals[c] = (totals[c] || 0) + v; }));
         debtsBox.appendChild(h('div', { class: 'totals' }, h('div', { class: 'big' }, fmtMap(totals)), h('div', { class: 'alt' }, rows.length + ' client(s) endetté(s), dont ' + rows.filter((d) => d.is_overdue).length + ' en retard')));
         rows.slice(0, 5).forEach((d) => debtsBox.appendChild(h('div', { class: 'row-card' }, h('div', { class: 'main' }, h('div', { class: 'title' }, d.customer.name), h('div', { class: 'sub' }, d.is_overdue ? 'En retard' : 'En cours')), h('div', { class: 'amount' }, fmtMap(d.balance)))));
-        debtsBox.appendChild(h('a', { class: 'btn btn-secondary btn-block', href: '/app/clients/' }, 'Voir tous les clients'));
       } catch (e) { debtsBox.appendChild(errorBox(e.message)); }
     }
 
     async function loadStock() {
-      clear(stockBox).appendChild(h('h2', null, 'Ruptures et stocks bas'));
+      clear(stockBox).appendChild(h('div', { class: 'card-head' }, h('h2', null, 'Ruptures et stocks bas'), h('a', { href: '/app/stock/' }, 'Voir le stock')));
       try {
         const rows = await K.listAll('stock/alerts/low-stock/?store=' + ctx.store.id, 3);
         if (!rows.length) stockBox.appendChild(K.alertBox('Aucun produit sous le seuil minimum.', 'ok'));
@@ -735,10 +796,20 @@
       } catch (e) { stockBox.appendChild(errorBox(e.message)); }
     }
 
+    const longDate = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    const quick = h('div', { class: 'quick' });
+    [['/app/caisse/', 'sale', 'Nouvelle vente', true, ['owner', 'manager', 'cashier']], ['/app/produits/', 'plus', 'Ajouter un produit', false, ['owner', 'manager', 'storekeeper']],
+      ['/app/clients/', 'credit', 'Clients et dettes', false, ['owner', 'manager', 'cashier', 'accountant']]].forEach(([href, key, label, primary, roles]) => {
+      if (roles.includes(ctx.role)) quick.appendChild(h('a', { href, class: primary ? 'primary' : '' }, icon(key), label));
+    });
     date.addEventListener('change', loadReport);
-    view.append(h('div', { class: 'toolbar' }, h('div', null, h('label', { for: 'dash-date', class: 'hint' }, 'Jour'), date)), salesBox,
-      h('div', { class: 'two-col' }, topBox, h('div', null, debtsBox, stockBox)));
-    await Promise.all([loadReport(), loadDebts(), loadStock()]);
+    view.append(
+      h('div', { class: 'dash-head' },
+        h('div', { class: 'dash-hello' }, greet + (first ? ', ' + first : '') + ' 👋', h('small', null, longDate.charAt(0).toUpperCase() + longDate.slice(1) + ' · ' + (ctx.store ? ctx.store.name : ''))),
+        h('div', { class: 'dash-date' }, h('label', { for: 'dash-date', class: 'hint' }, 'Jour'), date)),
+      quick, kpiBox,
+      h('div', { class: 'dash-grid' }, h('div', null, chartBox, topBox), h('div', null, debtsBox, stockBox)));
+    await Promise.all([loadReport(), loadWeek(), loadDebts(), loadStock()]);
   };
 
   /* ======================= UTILISATEURS ======================= */

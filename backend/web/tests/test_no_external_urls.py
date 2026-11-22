@@ -4,7 +4,9 @@ import re
 from pathlib import Path
 
 WEB = Path(__file__).resolve().parent.parent
-FILES = [*WEB.glob("templates/**/*.html"), *WEB.glob("static/**/*.*")]
+TEXT_SUFFIXES = {".html", ".css", ".js", ".json", ".svg", ".txt"}
+STATIC_TEXT = (p for p in WEB.glob("static/**/*.*") if p.suffix in TEXT_SUFFIXES)
+FILES = [*WEB.glob("templates/**/*.html"), *STATIC_TEXT]
 URL = re.compile(r"(?:https?:)?//[A-Za-z0-9.-]+\.[A-Za-z]{2,}", re.IGNORECASE)
 # Chaînes inertes tolérées : espaces de noms XML/SVG (jamais chargés).
 ALLOWED = ("www.w3.org",)

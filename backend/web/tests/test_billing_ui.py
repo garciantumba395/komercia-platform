@@ -18,7 +18,7 @@ def test_billing_page_is_valid_french_html(client):
     html = response.content.decode()
     assert html.lstrip().lower().startswith("<!doctype html>")
     assert '<html lang="fr">' in html
-    assert re.search(r"<title>Abonnement – Komersia</title>", html)
+    assert re.search(r"<title>Abonnement – Komersia.App</title>", html)
     assert 'data-page="billing"' in html and html.count("<main") == 1
     assert "web/billing.js" in html and "web/pages.js" not in html
     # bandeau global d'abonnement dans la mise en page de toutes les pages privées

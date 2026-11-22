@@ -31,6 +31,9 @@
     { id: 'billing', href: '/app/abonnement/', label: 'Abonnement', icon: '💳', roles: ['owner', 'manager', 'accountant'] },
     { id: 'backups', href: '/app/sauvegardes/', label: 'Sauvegardes', icon: '💾', roles: ['owner', 'manager'], optional: true },
   ];
+  const ICONS = {"pos": "<path d=\"M3 4h2l2.2 10.2a1.5 1.5 0 0 0 1.5 1.2h8.2a1.5 1.5 0 0 0 1.5-1.1L20 8H6.2\"/><circle cx=\"9\" cy=\"19.5\" r=\"1.4\"/><circle cx=\"17\" cy=\"19.5\" r=\"1.4\"/>", "products": "<path d=\"M21 8l-9-5-9 5 9 5 9-5z\"/><path d=\"M3 8v8l9 5 9-5V8\"/><path d=\"M12 13v8\"/>", "stock": "<path d=\"M3 21V9l9-6 9 6v12\"/><path d=\"M8 21v-7h8v7\"/>", "customers": "<circle cx=\"9\" cy=\"8\" r=\"3.2\"/><path d=\"M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6\"/><path d=\"M16 5.3a3.2 3.2 0 0 1 0 5.9M18 14.4c1.9.8 3 2.7 3 5.6\"/>", "sales": "<path d=\"M6 3h12v18l-3-2-3 2-3-2-3 2V3z\"/><path d=\"M9 8h6M9 12h6\"/>", "dashboard": "<path d=\"M4 20V10M10 20V4M16 20v-7M22 20H2\"/>", "rates": "<path d=\"M4 8h14l-3-3M20 16H6l3 3\"/>", "users": "<circle cx=\"8\" cy=\"15\" r=\"4\"/><path d=\"M11 12l8-8M16 7l2 2M14 9l2 2\"/>", "billing": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2.5\"/><path d=\"M3 10h18M7 15h4\"/>", "backups": "<ellipse cx=\"12\" cy=\"6\" rx=\"8\" ry=\"3\"/><path d=\"M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6\"/>"};
+  const svgIcon = (id) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[id] || '') + '</svg>';
+  K.svgIcon = svgIcon;
   K.ROLE_LABELS = ROLE_LABELS;
   const canOpen = (id, role) => NAV.some((n) => n.id === id && n.roles.includes(role));
   const homeFor = (role) => (NAV.find((n) => n.roles.includes(role)) || NAV[0]).href;
@@ -522,7 +525,9 @@
   function buildNav(role, page) {
     const list = document.getElementById('nav-list');
     NAV.filter((n) => n.roles.includes(role)).forEach((n) => {
-      const a = h('a', { href: n.href }, h('span', { 'aria-hidden': 'true' }, n.icon), n.label);
+      const ico = h('span', { class: 'ico', 'aria-hidden': 'true' });
+      ico.innerHTML = svgIcon(n.id); // SVG statique défini ci-dessus (aucune donnée utilisateur)
+      const a = h('a', { href: n.href }, ico, n.label);
       if (n.id === page) a.setAttribute('aria-current', 'page');
       // entrée facultative : cachée tant que l'API du module ne répond pas (ex. sauvegardes : édition locale)
       list.appendChild(h('li', { id: 'nav-' + n.id, hidden: !!n.optional }, a));
@@ -662,8 +667,10 @@
     store.set('kom_name', me.full_name);
     ctx.tenant = me.tenant;
     document.getElementById('user-label').textContent = '';
+    const initials = me.full_name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
     document.getElementById('user-label').append(
-      h('strong', null, me.full_name), h('br'), ROLE_LABELS[me.role] || me.role, ' · ', me.tenant.name);
+      h('span', { class: 'avatar', 'aria-hidden': 'true' }, initials),
+      h('div', { class: 'user-meta' }, h('strong', null, me.full_name), h('span', null, (ROLE_LABELS[me.role] || me.role) + ' · ' + me.tenant.name)));
 
     if (!canOpen(page, ctx.role)) {
       clear(view).append(alertBox('Votre rôle (' + (ROLE_LABELS[ctx.role] || ctx.role) + ') n’a pas accès à cette page.', 'warn'),

@@ -21,7 +21,7 @@ def test_backups_page_is_valid_french_html(client):
     html = response.content.decode()
     assert html.lstrip().lower().startswith("<!doctype html>")
     assert '<html lang="fr">' in html
-    assert re.search(r"<title>Sauvegardes – Komersia</title>", html)
+    assert re.search(r"<title>Sauvegardes – Komersia.App</title>", html)
     assert 'data-page="backups"' in html and html.count("<main") == 1 and 'id="view"' in html
     assert "web/backups.js" in html and "web/pages.js" not in html
     urls = re.findall(r'(?:src|href)="([^"]+)"', html)
