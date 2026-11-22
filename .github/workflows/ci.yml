@@ -142,7 +142,7 @@ jobs:
         run: docker build -f Dockerfile.test -t komersia-test .
       - name: Démarrer et vérifier
         run: |
-          docker run -d --name k -p 10000:10000 komersia-test
+          docker run -d --name komersia-test-ct -p 10000:10000 komersia-test
           for i in $(seq 1 60); do
             curl -fsS http://127.0.0.1:10000/health/ && break
             sleep 3
@@ -153,7 +153,7 @@ jobs:
           curl -fsS -o /dev/null http://127.0.0.1:10000/app/
       - name: Journaux en cas d'échec
         if: failure()
-        run: docker logs k || true
+        run: docker logs komersia-test-ct || true
 
   # TODO : déploiement automatique vers l'environnement de test (après validation du
   # backend ci-dessus). À définir lorsque l'hébergement sera choisi (cahier des charges,
