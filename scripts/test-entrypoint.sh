@@ -16,7 +16,7 @@ export DB_OPS_USER=komersia_ops DB_OPS_PASSWORD="$OPS_PW"
 mkdir -p "$PGDATA" && chown postgres:postgres "$PGDATA" && chmod 700 "$PGDATA"
 if [ ! -f "$PGDATA/PG_VERSION" ]; then
   PWFILE=$(mktemp) && rand > "$PWFILE" && chown postgres "$PWFILE"
-  gosu postgres "$PGBIN/initdb" -D "$PGDATA" -A scram-sha-256 --pwfile="$PWFILE" >/dev/null
+  gosu postgres "$PGBIN/initdb" -D "$PGDATA" --auth-local=trust --auth-host=scram-sha-256 --pwfile="$PWFILE" >/dev/null
   rm -f "$PWFILE"
 fi
 gosu postgres "$PGBIN/pg_ctl" -D "$PGDATA" -o "-c listen_addresses=127.0.0.1" -w -l /tmp/pg.log start >/dev/null
