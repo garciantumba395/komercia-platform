@@ -1,0 +1,14 @@
+{% extends "backoffice/base.html" %}
+{% block title %}Connexion{% endblock %}
+{% block content %}
+<h1>Connexion à la console</h1>
+<p class="muted">Réservée au personnel de Komersia.</p>
+{% if error %}<div class="msg error">{{ error }}</div>{% endif %}
+<form method="post" class="card" autocomplete="off">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}">
+  <p><label>Téléphone<br><input name="phone" value="{{ phone }}" required autofocus></label></p>
+  <p><label>Mot de passe<br><input type="password" name="password" required autocomplete="current-password"></label></p>
+  <button class="primary" type="submit">Se connecter</button>
+</form>
+{% endblock %}

@@ -1,0 +1,7 @@
+_build_info.py
+__pycache__/
+*.pyc
+build/work/
+build/dist/
+build/cache/
+build/output/

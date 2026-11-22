@@ -1,0 +1,6 @@
+{
+  "_commentaire": "PostgreSQL portable (zip des binaires EDB, Windows x64). Pour changer de version : modifier 'version' puis lancer le workflow « Installateur Windows » avec l'option 'afficher la somme SHA-256' ; copier la somme affichée dans 'sha256'. La construction ÉCHOUE tant que 'sha256' est vide.",
+  "version": "16.4-1",
+  "sha256": "3508d8f085bc3980f38211a82e3f31e5fcae9952105d3dc2f8be67b64a822baa",
+  "_origine_de_la_somme": "Calculée le 21/11/2026 par le job « Somme SHA-256 de PostgreSQL » du workflow Installateur Windows, sur le zip téléchargé en HTTPS depuis get.enterprisedb.com (première confiance, non recoupée avec une source indépendante : à vérifier sur la page de téléchargement EDB)."
+}

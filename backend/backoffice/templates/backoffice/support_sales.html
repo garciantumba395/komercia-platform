@@ -1,0 +1,10 @@
+{% extends "backoffice/support_base.html" %}
+{% load ops_extras %}
+{% block data %}
+{% if totals %}<p>Total du mois (terminées) : {% for t in totals %}{{ t.total|money:t.currency }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+<table>
+  <tr><th>Numéro</th><th>Date</th><th>Boutique</th><th>Caissier</th><th>Statut</th><th>Total</th></tr>
+  {% for r in rows %}<tr><td>{{ r.number }}</td><td class="nowrap">{{ r.created_at|date:"d/m/Y H:i" }}</td><td>{{ r.store__name }}</td><td>{{ r.cashier__full_name }}</td><td>{{ r.status }}</td><td>{{ r.total_minor|money:r.currency }}</td></tr>
+  {% empty %}<tr><td colspan="6" class="muted">Aucune vente.</td></tr>{% endfor %}
+</table>
+{% endblock %}

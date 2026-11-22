@@ -1,0 +1,183 @@
+# Installateur Windows de Komersia (édition locale) : construction + test d'intégration sur un VRAI Windows.
+# Voir docs/dev/edition-locale.md. Déclenché à la demande (onglet Actions > « Installateur Windows » > Run workflow)
+# et sur les étiquettes v* (ex. v1.0.0). L'installateur Komersia-Setup-<version>.exe est publié comme artefact,
+# SEULEMENT si le test d'intégration réussit.
+name: Installateur Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version de l'installateur (ex. 1.0.0). Vide : fichier desktop/VERSION."
+        required: false
+        default: ""
+      print_pg_hash:
+        description: "Seulement afficher la somme SHA-256 du zip PostgreSQL (à copier dans desktop/build/postgres.json), sans construire."
+        type: boolean
+        default: false
+  push:
+    # Branches de travail et principale : la construction se lance à chaque changement de l'installateur
+    # (le bouton « Run workflow » n'existe que pour les workflows présents sur la branche par défaut).
+    branches:
+      - "ccr-**"
+      - main
+    paths:
+      - "desktop/**"
+      - "backend/komersia/settings_local.py"
+      - "backend/komersia/urls_local.py"
+      - ".github/workflows/build-windows.yml"
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Préparation
+    runs-on: ubuntu-latest
+    outputs:
+      pg_sha_empty: ${{ steps.pg.outputs.empty }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: pg
+        name: La somme SHA-256 de PostgreSQL est-elle renseignée ?
+        run: |
+          if python3 -c "import json,sys; sys.exit(0 if not json.load(open('desktop/build/postgres.json'))['sha256'].strip() else 1)"; then
+            echo "empty=true" >> "$GITHUB_OUTPUT"
+            echo "La somme SHA-256 est vide : le job pg-hash va l'afficher."
+          else
+            echo "empty=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  pg-hash:
+    name: Somme SHA-256 de PostgreSQL
+    needs: prepare
+    if: ${{ needs.prepare.outputs.pg_sha_empty == 'true' || (github.event_name == 'workflow_dispatch' && inputs.print_pg_hash) }}
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Calculer la somme SHA-256 du zip PostgreSQL
+        shell: pwsh
+        run: ./desktop/build/build.ps1 -PrintPgHash
+
+  build:
+    name: Construire, installer et tester sur Windows
+    needs: prepare
+    if: ${{ needs.prepare.outputs.pg_sha_empty == 'false' && !(github.event_name == 'workflow_dispatch' && inputs.print_pg_hash) }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      UV_NO_PROGRESS: "1"
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Installer uv (avec cache)
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Installer Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "choco install innosetup a échoué ($LASTEXITCODE)" }
+
+      - name: Déterminer la version
+        id: ver
+        shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if ($env:GITHUB_REF -like 'refs/tags/v*') { $v = $env:GITHUB_REF_NAME.Substring(1) }
+          elseif ($env:INPUT_VERSION -and $env:INPUT_VERSION.Trim()) { $v = $env:INPUT_VERSION.Trim() }
+          else { $v = (Get-Content -Raw desktop/VERSION).Trim() }
+          if ($v -notmatch '^\d+\.\d+\.\d+([.-][0-9A-Za-z.-]+)?$') { throw "Version invalide : $v" }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Version : $v"
+
+      - name: Construire l'installateur (PostgreSQL portable, PyInstaller, Inno Setup)
+        shell: pwsh
+        run: ./desktop/build/build.ps1 -Version '${{ steps.ver.outputs.version }}'
+
+      - name: Test d'intégration (installation, démarrage, inscription, vente, arrêt, désinstallation)
+        shell: pwsh
+        run: |
+          ./desktop/build/ci-integration-test.ps1 `
+            -Setup "$PWD/desktop/build/output/Komersia-Setup-${{ steps.ver.outputs.version }}.exe" `
+            -Port 8000 -LogDir "$PWD/ci-logs"
+
+      - name: Publier l'installateur (artefact téléchargeable)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Komersia-Setup-${{ steps.ver.outputs.version }}
+          path: |
+            desktop/build/output/Komersia-Setup-${{ steps.ver.outputs.version }}.exe
+            desktop/build/output/Komersia-Setup-${{ steps.ver.outputs.version }}.exe.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publier les journaux (en cas d'échec ou non)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: journaux-windows-${{ steps.ver.outputs.version }}
+          path: ci-logs
+          if-no-files-found: ignore
+          retention-days: 14
+
+  deliver:
+    name: Livrer l'installateur sur la branche installateur-windows
+    # Une fois l'installateur construit ET testé sur Windows, il est publié sur une branche dédiée du dépôt :
+    # on peut ainsi le récupérer avec git (sans passer par les artefacts, qui exigent une connexion GitHub
+    # et un serveur de stockage séparé). La branche ne contient QUE l'installateur : elle est réécrite à chaque
+    # livraison (un seul commit) et peut être supprimée à tout moment.
+    needs: build
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Télécharger l'installateur construit
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Komersia-Setup-*
+          merge-multiple: true
+          path: livraison
+
+      - name: Publier sur la branche installateur-windows
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd livraison
+          ls -la
+          sha256sum -c ./*.sha256 2>/dev/null || sha256sum ./*.exe
+          cat > LISEZ-MOI.txt <<TXT
+          Komersia - installateur Windows (edition locale)
+          Construit depuis le commit ${GITHUB_SHA}.
+          Cet installateur a passe le test d'integration complet sur un vrai Windows (installation, vente,
+          sauvegarde, restauration, mise a jour, desinstallation).
+          Il n'est PAS signe : Windows SmartScreen affichera un avertissement
+          (Informations complementaires > Executer quand meme).
+          TXT
+          git init -q
+          git checkout -q -b installateur-windows
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -q -m "Installateur Windows (commit ${GITHUB_SHA::7})"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push -f origin installateur-windows

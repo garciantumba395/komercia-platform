@@ -1,0 +1,9 @@
+{% extends "backoffice/support_base.html" %}
+{% load ops_extras %}
+{% block data %}
+<table>
+  <tr><th>Nom</th><th>Référence</th><th>Type</th><th>Prix</th><th>Actif</th></tr>
+  {% for r in rows %}<tr><td>{{ r.name }}</td><td>{{ r.sku }}</td><td>{{ r.kind }}</td><td>{{ r.price_minor|money:r.currency }}</td><td>{{ r.is_active|yesno:"Oui,Non" }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="muted">Aucun produit.</td></tr>{% endfor %}
+</table>
+{% endblock %}

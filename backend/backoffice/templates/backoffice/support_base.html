@@ -1,0 +1,8 @@
+{% extends "backoffice/base.html" %}
+{% block title %}{{ title }} – {{ tenant.name }}{% endblock %}
+{% block content %}
+<p><a href="{% url 'ops:tenant_detail' tenant.id %}">← {{ tenant.name }}</a></p>
+<h1>{{ title }} – {{ tenant.name }}</h1>
+<div class="msg">Accès de support en LECTURE SEULE, consenti par le propriétaire jusqu'au {{ grant.expires_at|date:"d/m/Y H:i" }}. Cette consultation est journalisée.</div>
+{% block data %}{% endblock %}
+{% endblock %}
