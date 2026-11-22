@@ -137,3 +137,47 @@ jobs:
           path: ci-logs
           if-no-files-found: ignore
           retention-days: 14
+
+  deliver:
+    name: Livrer l'installateur sur la branche installateur-windows
+    # Une fois l'installateur construit ET testé sur Windows, il est publié sur une branche dédiée du dépôt :
+    # on peut ainsi le récupérer avec git (sans passer par les artefacts, qui exigent une connexion GitHub
+    # et un serveur de stockage séparé). La branche ne contient QUE l'installateur : elle est réécrite à chaque
+    # livraison (un seul commit) et peut être supprimée à tout moment.
+    needs: build
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Télécharger l'installateur construit
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Komersia-Setup-*
+          merge-multiple: true
+          path: livraison
+
+      - name: Publier sur la branche installateur-windows
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd livraison
+          ls -la
+          sha256sum -c ./*.sha256 2>/dev/null || sha256sum ./*.exe
+          cat > LISEZ-MOI.txt <<TXT
+          Komersia - installateur Windows (edition locale)
+          Construit depuis le commit ${GITHUB_SHA}.
+          Cet installateur a passe le test d'integration complet sur un vrai Windows (installation, vente,
+          sauvegarde, restauration, mise a jour, desinstallation).
+          Il n'est PAS signe : Windows SmartScreen affichera un avertissement
+          (Informations complementaires > Executer quand meme).
+          TXT
+          git init -q
+          git checkout -q -b installateur-windows
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -q -m "Installateur Windows (commit ${GITHUB_SHA::7})"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push -f origin installateur-windows
