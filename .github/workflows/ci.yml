@@ -132,6 +132,29 @@ jobs:
       - name: Suite de tests complète (rôle propriétaire)
         run: uv run pytest --create-db
 
+  # Image de TEST en ligne (Dockerfile.test) : construction + test de fumée (santé, connexion démo, interface).
+  test-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construire l'image
+        run: docker build -f Dockerfile.test -t komersia-test .
+      - name: Démarrer et vérifier
+        run: |
+          docker run -d --name k -p 10000:10000 komersia-test
+          for i in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:10000/health/ && break
+            sleep 3
+          done
+          curl -fsS http://127.0.0.1:10000/health/
+          curl -fsS -X POST http://127.0.0.1:10000/api/v1/auth/login/ -H 'Content-Type: application/json' \
+            -d '{"phone":"+243990000000","password":"Demo-1234!"}' | grep -q token
+          curl -fsS -o /dev/null http://127.0.0.1:10000/app/
+      - name: Journaux en cas d'échec
+        if: failure()
+        run: docker logs k || true
+
   # TODO : déploiement automatique vers l'environnement de test (après validation du
   # backend ci-dessus). À définir lorsque l'hébergement sera choisi (cahier des charges,
   # section 22). Volontairement non implémenté.

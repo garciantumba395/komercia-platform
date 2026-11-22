@@ -1,0 +1,13 @@
+# Plan Render (gratuit) pour TESTER Komersia en ligne : un seul service Docker, base PostgreSQL embarquée.
+# Données éphémères (démo recréée à chaque démarrage). Le service s'endort après ~15 min d'inactivité.
+services:
+  - type: web
+    name: komersia-test
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.test
+    dockerContext: .
+    healthCheckPath: /health/
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
