@@ -1,0 +1,6 @@
+Komersia - installateur Windows (edition locale)
+Construit depuis le commit d8d88f6f3a3ba1a79565f4db697b5a4f7b0e65d1.
+Cet installateur a passe le test d'integration complet sur un vrai Windows (installation, vente,
+sauvegarde, restauration, mise a jour, desinstallation).
+Il n'est PAS signe : Windows SmartScreen affichera un avertissement
+(Informations complementaires > Executer quand meme).
